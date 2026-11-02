@@ -352,7 +352,8 @@
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	justify-content: flex-start;
+	justify-content: center;
+	justify-content: safe center;
 	min-width: 0;
 	aspect-ratio: 1 / 1;
 	padding: clamp(8px, 2vw, 18px);
@@ -439,19 +440,9 @@
 	background: var(--mandala-gray-cell-color);
 }
 
-.mandala-engine-cell:not(.is-editing) > h3:first-child {
-	margin-top: auto;
-}
-
-.mandala-engine-cell:not(.is-editing) > h3:last-child,
-.mandala-engine-cell:not(.is-editing) > p:last-child,
-.mandala-engine-cell:not(.is-editing) > h3:nth-last-child(2),
-.mandala-engine-cell:not(.is-editing) > p:nth-last-child(2) {
-	margin-bottom: auto;
-}
-
 .mandala-engine-cell.is-editing {
 	justify-content: center;
+	justify-content: safe center;
 	gap: 0;
 	padding: clamp(6px, 1vw, 12px);
 	overflow: hidden;

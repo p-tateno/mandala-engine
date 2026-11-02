@@ -1,7 +1,7 @@
 {
   "id": "mandala-engine",
   "name": "Mandala Engine",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "minAppVersion": "1.4.0",
   "description": "Think and move through your Obsidian notes in a 3x3 Mandala.",
   "author": "Mandala Engine Project",
