@@ -831,6 +831,11 @@
 		transition: opacity 160ms ease;
 	}
 
+	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-track {
+		visibility: hidden;
+		opacity: 0;
+	}
+
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell.is-editing {
 		position: relative;
 		aspect-ratio: 1 / 1;
@@ -840,14 +845,14 @@
 		box-shadow: 0 20px 54px rgb(0 0 0 / 42%);
 	}
 
-	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__note-editor {
-		font-size: 0.82rem;
+	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell h3.mandala-engine-cell__note-editor {
+		font-size: 0.72rem;
 		line-height: 1.25;
 	}
 
-	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__summary-editor {
+	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell p.mandala-engine-cell__summary-editor {
 		max-height: none;
-		font-size: 0.68rem;
+		font-size: 0.58rem;
 		line-height: 1.5;
 	}
 
