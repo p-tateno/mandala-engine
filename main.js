@@ -2045,6 +2045,15 @@ class MandalaEngineView extends ItemView {
 			if ( position === 0 ) {
 				const summary = frontmatter.mandala_summary || '';
 				const isRootCell = this.mode === 'main' && this.track.length === 1;
+				const previousPath = this.mode === 'main' && this.track.length > 1
+					? this.track[ this.track.length - 2 ]
+					: '';
+				const previousFile = previousPath
+					? this.app.vault.getAbstractFileByPath( previousPath )
+					: null;
+				const parentPosition = previousFile instanceof TFile
+					? this.plugin.findCellPositionLinkingTo( previousFile, file )
+					: -1;
 
 				if ( this.editingPosition === 0 ) {
 					cell.addClass( 'is-editing' );
@@ -2083,6 +2092,35 @@ class MandalaEngineView extends ItemView {
 					} );
 					save.addEventListener( 'click', () => this.saveCurrentEditing() );
 
+					if ( previousFile instanceof TFile && parentPosition > 0 ) {
+						const previousCache = this.app.metadataCache.getFileCache( previousFile );
+						const previousFrontmatter = previousCache && previousCache.frontmatter
+							? previousCache.frontmatter
+							: {};
+						const connectionType = this.plugin.getCellConnectionType(
+							previousFrontmatter,
+							parentPosition,
+							file
+						);
+						const clear = actions.createEl( 'button', { text: '解除' } );
+						clear.addEventListener( 'click', () => {
+							new DeleteLinkedFileModal(
+								this.app,
+								this.plugin,
+								file,
+								connectionType,
+								async () => {
+									this.editingPosition = null;
+									this.editMode = false;
+									this.editingInitial = null;
+									this.mobileEditingOrigin = null;
+									await this.plugin.clearCell( previousFile, parentPosition );
+									await this.navigateTo( previousFile );
+								}
+							).open();
+						} );
+					}
+
 					const cancel = actions.createEl( 'button', { text: '取消' } );
 					cancel.addEventListener( 'click', () => this.requestExitEditing() );
 					continue;
@@ -2093,12 +2131,6 @@ class MandalaEngineView extends ItemView {
 					cell.createEl( 'p', { text: String( summary ) } );
 				}
 
-				const previousPath = this.mode === 'main' && this.track.length > 1
-					? this.track[ this.track.length - 2 ]
-					: '';
-				const previousFile = previousPath
-					? this.app.vault.getAbstractFileByPath( previousPath )
-					: null;
 				const parent = this.plugin.getMandalaParentLink( frontmatter, file );
 				if ( isRootCell ) {
 					cell.addClass( 'is-editable' );
@@ -2128,10 +2160,6 @@ class MandalaEngineView extends ItemView {
 					cell.dataset.editTitle = this.plugin.getMandalaTitle( file );
 					cell.dataset.editSummary = String( summary );
 					cell.setAttr( 'tabindex', '0' );
-					const parentPosition = this.plugin.findCellPositionLinkingTo(
-						previousFile,
-						file
-					);
 					this.registerCenterCellDrag(
 						cell,
 						previousFile,
