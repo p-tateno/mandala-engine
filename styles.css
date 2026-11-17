@@ -777,6 +777,14 @@
 }
 
 @media (max-width: 480px) {
+	.is-mobile .mandala-engine-workspace {
+		transform: translateY(-5dvh);
+	}
+
+	.is-mobile .mandala-engine-mobile-move-hint {
+		bottom: calc(88px + env(safe-area-inset-bottom));
+	}
+
 	.mandala-engine-track {
 		bottom: calc(100% + 8px);
 		font-size: 0.7rem;
