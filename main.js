@@ -998,6 +998,46 @@ class MandalaEngineView extends ItemView {
 		return title;
 	}
 
+	async hasMarkdownBody( file ) {
+		if ( ! ( file instanceof TFile ) || file.extension !== 'md' ) {
+			return false;
+		}
+		try {
+			const content = await this.app.vault.cachedRead( file );
+			const body = content.replace(
+				/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,
+				''
+			);
+			return body.trim().length > 0;
+		} catch ( error ) {
+			console.error( 'Mandala Engine body check failed:', error );
+			return false;
+		}
+	}
+
+	isFileLinkedFromCurrentMandala( linkedFile ) {
+		const currentFile = this.getCurrentFile();
+		if ( ! ( currentFile instanceof TFile ) || ! ( linkedFile instanceof TFile ) ) {
+			return false;
+		}
+		const cache = this.app.metadataCache.getFileCache( currentFile );
+		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
+		for ( let position = 1; position <= 8; position += 1 ) {
+			const link = this.plugin.cleanLink( frontmatter[ `mandala_${ position }` ] || '' );
+			if ( ! link ) {
+				continue;
+			}
+			const candidate = this.app.metadataCache.getFirstLinkpathDest(
+				link,
+				currentFile.path
+			);
+			if ( candidate instanceof TFile && candidate.path === linkedFile.path ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	getEditorValues() {
 		if ( this.editingPosition === null ) {
 			return null;
@@ -1599,7 +1639,10 @@ class MandalaEngineView extends ItemView {
 		);
 		this.registerEvent(
 			this.app.metadataCache.on( 'changed', ( changedFile ) => {
-				if ( changedFile === this.getCurrentFile() ) {
+				if (
+					changedFile === this.getCurrentFile()
+					|| this.isFileLinkedFromCurrentMandala( changedFile )
+				) {
 					this.render();
 				}
 			} )
@@ -2294,7 +2337,11 @@ class MandalaEngineView extends ItemView {
 			this.registerCellReorder( cell, file, position, linkedFile );
 
 			if ( linkedFile ) {
-				if ( connectionType === 'reference' && ! linkedIsMandalaRoot ) {
+				const showsMarkdownIcon = (
+					connectionType === 'reference'
+					&& ! linkedIsMandalaRoot
+				) || await this.hasMarkdownBody( linkedFile );
+				if ( showsMarkdownIcon ) {
 					cell.addClass( 'is-reference-document' );
 					this.createReferenceTitle(
 						cell,
