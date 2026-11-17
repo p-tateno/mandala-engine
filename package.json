@@ -1,10 +1,10 @@
 {
   "name": "mandala-engine",
-  "version": "0.28.5",
+	"version": "0.28.6",
   "private": true,
   "description": "Think and move through Obsidian notes in a 3x3 Mandala.",
   "scripts": {
     "check": "node --check main.js && node -e \"JSON.parse(require('fs').readFileSync('manifest.json')); JSON.parse(require('fs').readFileSync('versions.json'))\"",
-    "package": "zip -j mandala-engine-0.28.5.zip main.js manifest.json styles.css"
+		"package": "zip -j mandala-engine-0.28.6.zip main.js manifest.json styles.css"
   }
 }

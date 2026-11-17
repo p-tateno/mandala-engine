@@ -683,17 +683,18 @@ class MandalaEngineView extends ItemView {
 				try {
 					await this.navigateTo( linkedFile );
 				} finally {
+					this.dragLastActivity = Date.now();
 					setTimeout( () => {
 						this.dragNavigationInProgress = false;
 					}, 120 );
 					setTimeout( () => {
 						if (
 							this.draggedCell
-							&& Date.now() - this.dragLastActivity > 650
+							&& Date.now() - this.dragLastActivity > 1500
 						) {
 							this.clearCellDrag();
 						}
-					}, 750 );
+					}, 1800 );
 				}
 			}, 900 );
 		}, 1800 );
@@ -760,7 +761,11 @@ class MandalaEngineView extends ItemView {
 			}
 		} );
 		cell.addEventListener( 'dragend', () => {
-			if ( this.dragNavigationInProgress ) {
+			if (
+				this.dragNavigationInProgress
+				|| ( this.draggedCell && this.draggedCell.crossPage )
+			) {
+				this.deferCrossPageDragCleanup();
 				return;
 			}
 			this.clearCellDrag();
@@ -780,6 +785,18 @@ class MandalaEngineView extends ItemView {
 		setTimeout( () => {
 			this.suppressCellClick = false;
 		}, 0 );
+	}
+
+	deferCrossPageDragCleanup() {
+		setTimeout( () => {
+			if (
+				this.draggedCell
+				&& ! this.dragNavigationInProgress
+				&& Date.now() - this.dragLastActivity > 1500
+			) {
+				this.clearCellDrag();
+			}
+		}, 1800 );
 	}
 
 	isMobileCellClickSuppressed( sourcePath, position ) {
@@ -1506,7 +1523,11 @@ class MandalaEngineView extends ItemView {
 			}
 		} );
 		cell.addEventListener( 'dragend', () => {
-			if ( this.dragNavigationInProgress ) {
+			if (
+				this.dragNavigationInProgress
+				|| ( this.draggedCell && this.draggedCell.crossPage )
+			) {
+				this.deferCrossPageDragCleanup();
 				return;
 			}
 			this.clearCellDrag();
@@ -1560,9 +1581,14 @@ class MandalaEngineView extends ItemView {
 			}
 		} );
 		this.registerDomEvent( this.containerEl.ownerDocument, 'dragend', () => {
-			if ( ! this.dragNavigationInProgress && this.draggedCell ) {
-				this.clearCellDrag();
+			if ( ! this.draggedCell ) {
+				return;
 			}
+			if ( this.dragNavigationInProgress || this.draggedCell.crossPage ) {
+				this.deferCrossPageDragCleanup();
+				return;
+			}
+			this.clearCellDrag();
 		} );
 		this.registerEvent(
 			this.app.workspace.on( 'file-open', () => {
