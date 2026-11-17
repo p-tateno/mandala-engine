@@ -36,9 +36,9 @@
 
 .mandala-engine-view.mandala-engine-view--colors-obsidian,
 .theme-dark .mandala-engine-view.mandala-engine-view--colors-obsidian {
-	--mandala-background-color: var(--background-secondary);
+	--mandala-background-color: var(--background-primary);
 	--mandala-gray-cell-color: var(--background-secondary-alt, var(--background-modifier-hover));
-	--mandala-cell-color: var(--background-primary);
+	--mandala-cell-color: var(--background-secondary);
 	--mandala-text-color: var(--text-normal);
 	--mandala-muted-color: var(--text-muted);
 	--mandala-subtle-color: var(--text-faint);
