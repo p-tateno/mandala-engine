@@ -534,6 +534,8 @@ class MandalaEngineView extends ItemView {
 		this.mobileTouchGesture = null;
 		this.mobileClickSuppressUntil = 0;
 		this.mobileClickSuppressTarget = '';
+		this.mobileEditingOrigin = null;
+		this.mobileEditorAnimating = false;
 	}
 
 	getViewType() {
@@ -1006,6 +1008,7 @@ class MandalaEngineView extends ItemView {
 		};
 		this.paletteOpen = false;
 		await this.render();
+		this.animateMobileEditorEntry( position );
 		const editor = this.containerEl.querySelector(
 			`.mandala-engine-cell[data-position="${ position }"] .mandala-engine-cell__note-editor`
 		);
@@ -1018,11 +1021,76 @@ class MandalaEngineView extends ItemView {
 		if ( ! cell || cell.dataset.canEdit !== 'true' ) {
 			return;
 		}
+		const origin = cell.getBoundingClientRect();
+		this.mobileEditingOrigin = {
+			left: origin.left,
+			top: origin.top,
+			width: origin.width,
+			height: origin.height,
+		};
 		await this.beginEditing(
 			Number( cell.dataset.position ),
 			cell.dataset.editTitle || '',
 			cell.dataset.editSummary || ''
 		);
+	}
+
+	animateMobileEditorEntry( position ) {
+		const cell = this.containerEl.querySelector(
+			`.mandala-engine-cell.is-editing[data-position="${ position }"]`
+		);
+		if ( ! cell || ! this.mobileEditingOrigin ) {
+			return;
+		}
+		const target = cell.getBoundingClientRect();
+		if ( ! target.width || ! target.height ) {
+			return;
+		}
+		cell.style.setProperty(
+			'--mandala-editor-from-x',
+			`${ this.mobileEditingOrigin.left - target.left }px`
+		);
+		cell.style.setProperty(
+			'--mandala-editor-from-y',
+			`${ this.mobileEditingOrigin.top - target.top }px`
+		);
+		cell.style.setProperty(
+			'--mandala-editor-from-scale-x',
+			String( this.mobileEditingOrigin.width / target.width )
+		);
+		cell.style.setProperty(
+			'--mandala-editor-from-scale-y',
+			String( this.mobileEditingOrigin.height / target.height )
+		);
+		cell.addClass( 'is-mobile-editor-entering' );
+		requestAnimationFrame( () => {
+			requestAnimationFrame( () => {
+				cell.removeClass( 'is-mobile-editor-entering' );
+			} );
+		} );
+	}
+
+	async animateMobileEditorExit() {
+		if ( this.mobileEditorAnimating || ! this.mobileEditingOrigin ) {
+			return;
+		}
+		const cell = this.containerEl.querySelector( '.mandala-engine-cell.is-editing' );
+		const view = cell && cell.ownerDocument.defaultView;
+		if (
+			! cell
+			|| ! view
+			|| view.getComputedStyle( cell ).position !== 'fixed'
+		) {
+			return;
+		}
+		this.mobileEditorAnimating = true;
+		const active = this.containerEl.ownerDocument.activeElement;
+		if ( active && typeof active.blur === 'function' ) {
+			active.blur();
+		}
+		cell.addClass( 'is-mobile-editor-exiting' );
+		await new Promise( ( resolve ) => setTimeout( resolve, 260 ) );
+		this.mobileEditorAnimating = false;
 	}
 
 	hasUnsavedChanges() {
@@ -1038,12 +1106,16 @@ class MandalaEngineView extends ItemView {
 	}
 
 	async saveCurrentEditing() {
+		if ( this.mobileEditorAnimating ) {
+			return false;
+		}
 		const position = this.editingPosition;
 		const values = this.getEditorValues();
 		const file = this.getCurrentFile();
 		if ( position === null || ! values || ! ( file instanceof TFile ) ) {
 			return false;
 		}
+		await this.animateMobileEditorExit();
 
 		const cache = this.app.metadataCache.getFileCache( file );
 		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
@@ -1057,6 +1129,7 @@ class MandalaEngineView extends ItemView {
 		if ( saved ) {
 			this.editMode = false;
 			this.editingInitial = null;
+			this.mobileEditingOrigin = null;
 			return true;
 		}
 
@@ -1066,9 +1139,14 @@ class MandalaEngineView extends ItemView {
 	}
 
 	async discardCurrentEditing() {
+		if ( this.mobileEditorAnimating ) {
+			return;
+		}
+		await this.animateMobileEditorExit();
 		this.editMode = false;
 		this.editingPosition = null;
 		this.editingInitial = null;
+		this.mobileEditingOrigin = null;
 		await this.render();
 	}
 
@@ -1516,8 +1594,12 @@ class MandalaEngineView extends ItemView {
 		container.removeClass( 'mandala-engine-view--theme-auto' );
 		container.removeClass( 'mandala-engine-view--theme-light' );
 		container.removeClass( 'mandala-engine-view--theme-dark' );
+		container.removeClass( 'is-mobile-editing' );
 		container.addClass( 'mandala-engine-view' );
 		container.addClass( `mandala-engine-view--${ this.mode }` );
+		if ( this.editingPosition !== null ) {
+			container.addClass( 'is-mobile-editing' );
+		}
 		const file = this.getCurrentFile();
 		if (
 			this.mode === 'main'
@@ -1832,6 +1914,11 @@ class MandalaEngineView extends ItemView {
 
 		const cache = this.app.metadataCache.getFileCache( file );
 		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
+		if ( this.mode === 'main' ) {
+			const portraitNotice = container.createDiv( 'mandala-engine-portrait-notice' );
+			portraitNotice.createEl( 'strong', { text: '縦向きでお使いください' } );
+			portraitNotice.createEl( 'span', { text: 'iPhoneを縦向きにするとマンダラを表示します。' } );
+		}
 		const workspace = this.mode === 'main'
 			? container.createDiv( 'mandala-engine-workspace' )
 			: container;
@@ -2118,25 +2205,27 @@ class MandalaEngineView extends ItemView {
 				} );
 				save.addEventListener( 'click', () => this.saveCurrentEditing() );
 
-				const clear = actions.createEl( 'button', { text: '解除' } );
-				clear.disabled = ! link;
-				clear.addEventListener( 'click', () => {
-					if ( ! linkedFile ) {
-						return;
-					}
-					new DeleteLinkedFileModal(
-						this.app,
-						this.plugin,
-						linkedFile,
-						connectionType,
-						async () => {
-							this.editingPosition = null;
-							this.editMode = false;
-							this.editingInitial = null;
-							await this.plugin.clearCell( file, position );
-						}
-					).open();
-				} );
+				if ( linkedFile ) {
+					const clear = actions.createEl( 'button', { text: '解除' } );
+					clear.addEventListener( 'click', () => {
+						new DeleteLinkedFileModal(
+							this.app,
+							this.plugin,
+							linkedFile,
+							connectionType,
+							async () => {
+								this.editingPosition = null;
+								this.editMode = false;
+								this.editingInitial = null;
+								this.mobileEditingOrigin = null;
+								await this.plugin.clearCell( file, position );
+							}
+						).open();
+					} );
+				}
+
+				const cancel = actions.createEl( 'button', { text: '取消' } );
+				cancel.addEventListener( 'click', () => this.requestExitEditing() );
 				continue;
 			}
 
