@@ -786,11 +786,11 @@
 	}
 
 	.is-mobile .mandala-engine-view--main .mandala-engine-cell h3 {
-		font-size: clamp(1rem, 1.8vw, 1.35rem);
+		font-size: 1rem;
 	}
 
 	.is-mobile .mandala-engine-view--main .mandala-engine-cell p {
-		font-size: clamp(0.78rem, 1.35vw, 0.98rem);
+		font-size: 0.78rem;
 	}
 
 	.is-mobile .mandala-engine-track {
@@ -805,6 +805,14 @@
 }
 
 @media (max-width: 480px) {
+	.is-mobile .mandala-engine-view--main .mandala-engine-cell h3 {
+		font-size: 1rem;
+	}
+
+	.is-mobile .mandala-engine-view--main .mandala-engine-cell p {
+		font-size: 0.72rem;
+	}
+
 	.is-mobile .mandala-engine-workspace {
 		transform: translateY(-5dvh);
 	}
