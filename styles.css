@@ -690,7 +690,7 @@
 
 /* Mobile layout: keep the complete 3×3 board usable on iPhone and iPad. */
 .is-mobile .mandala-engine-view--main {
-	padding: max(72px, 11vh) 10px 28px;
+	padding: max(72px, 11vh) 10px;
 	-webkit-overflow-scrolling: touch;
 }
 
