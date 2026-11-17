@@ -804,34 +804,30 @@
 		transform: none;
 	}
 
-	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-workspace::before {
-		position: fixed;
-		inset: 0;
-		z-index: 2;
-		background: rgb(0 0 0 / 38%);
-		content: '';
-		backdrop-filter: blur(2px);
+	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell:not(.is-editing) {
+		opacity: 0.72;
+		filter: none;
+		transition: opacity 220ms ease;
 	}
 
-	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell:not(.is-editing) {
-		opacity: 0.28;
-		filter: blur(1px);
-		transition: opacity 220ms ease, filter 220ms ease;
+	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell:not(.is-editing) > * {
+		opacity: 0;
+		transition: opacity 160ms ease;
 	}
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell.is-editing {
 		position: fixed;
-		top: clamp(132px, 18dvh, 170px);
-		right: 14px;
-		left: 14px;
+		top: 160px;
+		right: 12vw;
+		left: 12vw;
 		z-index: 4;
 		width: auto;
-		height: min(360px, calc(100dvh - 250px));
-		min-height: 250px;
-		aspect-ratio: auto;
+		height: auto;
+		min-height: 0;
+		aspect-ratio: 1 / 1;
 		padding: 24px 20px 66px;
 		overflow: hidden;
-		border-radius: 18px;
+		border-radius: 14px;
 		box-shadow: 0 20px 54px rgb(0 0 0 / 42%);
 		transform: none;
 		transform-origin: top left;
