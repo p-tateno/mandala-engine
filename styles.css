@@ -531,11 +531,11 @@
 }
 
 .mandala-engine-view--main .mandala-engine-cell {
-	padding: clamp(18px, 2.4vw, 32px);
+	padding: clamp(14px, 1.6vw, 22px);
 }
 
 .mandala-engine-view--main .mandala-engine-cell.has-vertical-scroll {
-	padding-right: max(8px, calc(clamp(18px, 2.4vw, 32px) - 12px));
+	padding-right: max(8px, calc(clamp(14px, 1.6vw, 22px) - 12px));
 }
 
 .mandala-engine-cell.is-linked,
