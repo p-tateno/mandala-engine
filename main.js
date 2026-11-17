@@ -531,6 +531,9 @@ class MandalaEngineView extends ItemView {
 		this.backgroundImageDropBinding = null;
 		this.containerClickBinding = null;
 		this.forbiddenDragTargetCache = new Map();
+		this.mobileTouchGesture = null;
+		this.mobileClickSuppressUntil = 0;
+		this.mobileClickSuppressTarget = '';
 	}
 
 	getViewType() {
@@ -777,6 +780,145 @@ class MandalaEngineView extends ItemView {
 		}, 0 );
 	}
 
+	isMobileCellClickSuppressed( sourcePath, position ) {
+		const target = `${ sourcePath }::${ position }`;
+		if (
+			Date.now() >= this.mobileClickSuppressUntil
+			|| target !== this.mobileClickSuppressTarget
+		) {
+			return false;
+		}
+		this.mobileClickSuppressUntil = 0;
+		this.mobileClickSuppressTarget = '';
+		return true;
+	}
+
+	suppressMobileCellClick( sourcePath, position, duration = 750 ) {
+		this.mobileClickSuppressUntil = Date.now() + duration;
+		this.mobileClickSuppressTarget = `${ sourcePath }::${ position }`;
+	}
+
+	clearMobileTouchGesture() {
+		const gesture = this.mobileTouchGesture;
+		if ( gesture && gesture.timer ) {
+			clearTimeout( gesture.timer );
+		}
+		this.mobileTouchGesture = null;
+		const container = this.containerEl.children[ 1 ] || this.containerEl;
+		container.removeClass( 'is-mobile-move-mode' );
+		for ( const source of container.querySelectorAll( '.is-mobile-move-source' ) ) {
+			source.removeClass( 'is-mobile-move-source' );
+		}
+		for ( const hint of container.querySelectorAll( '.mandala-engine-mobile-move-hint' ) ) {
+			hint.remove();
+		}
+	}
+
+	startMobileTouchGesture( cell, sourceFile, position, linkedFile ) {
+		if (
+			! ( sourceFile instanceof TFile )
+			|| ! ( linkedFile instanceof TFile )
+			|| position === 0
+		) {
+			return;
+		}
+		this.clearMobileTouchGesture();
+		this.mobileTouchGesture = {
+			sourcePath: sourceFile.path,
+			position,
+			linkedPath: linkedFile.path,
+		};
+		const container = this.containerEl.children[ 1 ] || this.containerEl;
+		container.addClass( 'is-mobile-move-mode' );
+		cell.addClass( 'is-mobile-move-source' );
+		const hint = container.createDiv( 'mandala-engine-mobile-move-hint' );
+		hint.createEl( 'span', { text: '移動先のセルをタップ' } );
+		const cancel = hint.createEl( 'button', {
+			text: '取消',
+			attr: { type: 'button' },
+		} );
+		cancel.addEventListener( 'click', ( event ) => {
+			event.preventDefault();
+			event.stopPropagation();
+			this.clearMobileTouchGesture();
+		} );
+	}
+
+	async handleMobileTouchTarget( targetFile, position, linkedFile ) {
+		const gesture = this.mobileTouchGesture;
+		if ( ! gesture ) {
+			return false;
+		}
+		if (
+			position === 0
+			|| (
+				targetFile.path === gesture.sourcePath
+				&& position === gesture.position
+			)
+		) {
+			this.clearMobileTouchGesture();
+			return true;
+		}
+		if ( targetFile.path !== gesture.sourcePath ) {
+			new Notice( '移動先は同じマンダラ内のセルを選んでください。' );
+			this.clearMobileTouchGesture();
+			return true;
+		}
+		const fromPosition = gesture.position;
+		this.clearMobileTouchGesture();
+		await this.plugin.swapCells(
+			targetFile,
+			fromPosition,
+			position,
+			Boolean( linkedFile )
+		);
+		return true;
+	}
+
+	registerMobileTouchInteraction( cell, sourceFile, position, linkedFile ) {
+		let timer = null;
+		let startX = 0;
+		let startY = 0;
+		cell.addEventListener( 'touchstart', ( event ) => {
+			if ( event.touches.length !== 1 || this.editingPosition !== null ) {
+				return;
+			}
+			if ( timer ) {
+				clearTimeout( timer );
+			}
+			const touch = event.touches[ 0 ];
+			startX = touch.clientX;
+			startY = touch.clientY;
+			timer = setTimeout( async () => {
+				timer = null;
+				this.suppressMobileCellClick( sourceFile.path, position );
+				if ( linkedFile instanceof TFile && position !== 0 ) {
+					this.startMobileTouchGesture( cell, sourceFile, position, linkedFile );
+				} else {
+					await this.beginEditingFromCell( cell );
+				}
+			}, 600 );
+		}, { passive: true } );
+		cell.addEventListener( 'touchmove', ( event ) => {
+			if ( ! timer || ! event.touches.length ) {
+				return;
+			}
+			const touch = event.touches[ 0 ];
+			if ( Math.hypot( touch.clientX - startX, touch.clientY - startY ) > 12 ) {
+				clearTimeout( timer );
+				timer = null;
+			}
+		}, { passive: true } );
+		for ( const eventName of [ 'touchend', 'touchcancel' ] ) {
+			cell.addEventListener( eventName, () => {
+				if ( timer ) {
+					clearTimeout( timer );
+					timer = null;
+				}
+			}, { passive: true } );
+		}
+	}
+
 	isForbiddenDragTarget( targetMandalaFile ) {
 		if ( ! this.draggedCell || ! ( targetMandalaFile instanceof TFile ) ) {
 			return false;
@@ -855,6 +997,7 @@ class MandalaEngineView extends ItemView {
 		if ( this.editingPosition !== null ) {
 			return;
 		}
+		this.clearMobileTouchGesture();
 		this.editMode = true;
 		this.editingPosition = position;
 		this.editingInitial = {
@@ -1355,12 +1498,14 @@ class MandalaEngineView extends ItemView {
 
 	async onClose() {
 		this.clearCellDrag();
+		this.clearMobileTouchGesture();
 		this.clearBackgroundImageDrop();
 		this.clearContainerClickBinding();
 	}
 
 	async render() {
 		const container = this.containerEl.children[ 1 ];
+		this.clearMobileTouchGesture();
 		this.clearBackgroundImageDrop();
 		this.clearContainerClickBinding();
 		container.empty();
@@ -1840,7 +1985,13 @@ class MandalaEngineView extends ItemView {
 					cell.dataset.editTitle = this.plugin.getMandalaTitle( file );
 					cell.dataset.editSummary = String( summary );
 					cell.setAttr( 'tabindex', '0' );
-					cell.addEventListener( 'click', ( event ) => {
+					cell.addEventListener( 'click', async ( event ) => {
+						if ( this.isMobileCellClickSuppressed( file.path, 0 ) ) {
+							return;
+						}
+						if ( await this.handleMobileTouchTarget( file, 0, file ) ) {
+							return;
+						}
 						if ( event.altKey ) {
 							this.openMarkdownFile( file );
 							return;
@@ -1867,7 +2018,13 @@ class MandalaEngineView extends ItemView {
 						file
 					);
 					this.registerDragBackNavigation( cell, file, previousFile );
-					cell.addEventListener( 'click', ( event ) => {
+					cell.addEventListener( 'click', async ( event ) => {
+						if ( this.isMobileCellClickSuppressed( file.path, 0 ) ) {
+							return;
+						}
+						if ( await this.handleMobileTouchTarget( file, 0, file ) ) {
+							return;
+						}
 						if ( event.altKey ) {
 							this.openMarkdownFile( file );
 						} else if ( event.shiftKey ) {
@@ -1880,7 +2037,13 @@ class MandalaEngineView extends ItemView {
 					const parentFile = this.app.metadataCache.getFirstLinkpathDest( parent, file.path );
 					cell.addClass( 'is-linked' );
 					if ( parentFile ) {
-						cell.addEventListener( 'click', ( event ) => {
+						cell.addEventListener( 'click', async ( event ) => {
+							if ( this.isMobileCellClickSuppressed( file.path, 0 ) ) {
+								return;
+							}
+							if ( await this.handleMobileTouchTarget( file, 0, file ) ) {
+								return;
+							}
 							if ( event.altKey ) {
 								this.openMarkdownFile( file );
 							} else {
@@ -1889,6 +2052,7 @@ class MandalaEngineView extends ItemView {
 						} );
 					}
 				}
+				this.registerMobileTouchInteraction( cell, file, 0, file );
 				continue;
 			}
 
@@ -2004,7 +2168,13 @@ class MandalaEngineView extends ItemView {
 			cell.setAttr( 'tabindex', '0' );
 
 			cell.addEventListener( 'click', async ( event ) => {
-				if ( this.suppressCellClick ) {
+				if (
+					this.suppressCellClick
+					|| this.isMobileCellClickSuppressed( file.path, position )
+				) {
+					return;
+				}
+				if ( await this.handleMobileTouchTarget( file, position, linkedFile ) ) {
 					return;
 				}
 				if ( event.shiftKey || ! linkedFile ) {
@@ -2030,25 +2200,7 @@ class MandalaEngineView extends ItemView {
 					}
 				}
 			} );
-			let longPressTimer = null;
-			cell.addEventListener( 'touchstart', () => {
-				longPressTimer = setTimeout( async () => {
-					longPressTimer = null;
-					this.suppressCellClick = true;
-					await this.beginEditingFromCell( cell );
-					setTimeout( () => {
-						this.suppressCellClick = false;
-					}, 750 );
-				}, 550 );
-			}, { passive: true } );
-			for ( const eventName of [ 'touchend', 'touchmove', 'touchcancel' ] ) {
-				cell.addEventListener( eventName, () => {
-					if ( longPressTimer ) {
-						clearTimeout( longPressTimer );
-						longPressTimer = null;
-					}
-				}, { passive: true } );
-			}
+			this.registerMobileTouchInteraction( cell, file, position, linkedFile );
 		}
 
 		for ( const cell of grid.querySelectorAll( '.mandala-engine-cell:not(.is-editing)' ) ) {
