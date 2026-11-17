@@ -1057,7 +1057,7 @@ class MandalaEngineView extends ItemView {
 		const targetCenterX = target.left + target.width / 2;
 		const targetCenterY = target.top + target.height / 2;
 		const desiredCenterX = view.innerWidth / 2;
-		const desiredCenterY = 400;
+		const desiredCenterY = 440;
 		grid.style.setProperty( '--mandala-editor-grid-scale', String( scale ) );
 		grid.style.setProperty(
 			'--mandala-editor-grid-x',
