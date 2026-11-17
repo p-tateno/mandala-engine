@@ -782,7 +782,25 @@
 
 @media (min-width: 700px) and (min-height: 600px) {
 	.is-mobile .mandala-engine-workspace {
-		width: min(100%, 460px);
+		width: min(100%, 520px);
+	}
+
+	.is-mobile .mandala-engine-view--main .mandala-engine-cell h3 {
+		font-size: clamp(1rem, 1.8vw, 1.35rem);
+	}
+
+	.is-mobile .mandala-engine-view--main .mandala-engine-cell p {
+		font-size: clamp(0.78rem, 1.35vw, 0.98rem);
+	}
+
+	.is-mobile .mandala-engine-track {
+		font-size: 0.7rem;
+	}
+}
+
+@media (min-width: 700px) and (min-height: 600px) and (orientation: landscape) {
+	.is-mobile .mandala-engine-view--main {
+		padding: 48px 12px 30px;
 	}
 }
 
