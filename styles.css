@@ -34,6 +34,22 @@
 	--mandala-shadow-color: rgb(0 0 0 / 48%);
 }
 
+.mandala-engine-view.mandala-engine-view--colors-obsidian,
+.theme-dark .mandala-engine-view.mandala-engine-view--colors-obsidian {
+	--mandala-background-color: var(--background-secondary);
+	--mandala-gray-cell-color: var(--background-secondary-alt, var(--background-modifier-hover));
+	--mandala-cell-color: var(--background-primary);
+	--mandala-text-color: var(--text-normal);
+	--mandala-muted-color: var(--text-muted);
+	--mandala-subtle-color: var(--text-faint);
+	--mandala-faint-color: var(--text-faint);
+	--mandala-panel-color: var(--background-primary);
+	--mandala-soft-surface: var(--background-modifier-hover);
+	--mandala-soft-surface-hover: var(--background-modifier-active-hover);
+	--mandala-border-color: var(--background-modifier-border);
+	--mandala-shadow-color: var(--background-modifier-box-shadow, rgb(0 0 0 / 18%));
+}
+
 .mandala-engine-view--main {
 	position: relative;
 	display: flex;

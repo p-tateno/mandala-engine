@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
 	cellColorMode: 'all-white',
 	autoOpenRootNotes: true,
 	themeMode: 'auto',
+	colorSource: 'mandala',
 };
 const DEFAULT_BACKGROUND_COLOR = '#e3e3e3';
 const DEFAULT_GRAY_CELL_COLOR = '#f3f3f3';
@@ -60,6 +61,19 @@ class MandalaEngineSettingTab extends PluginSettingTab {
 					.setValue( this.plugin.settings.cellColorMode )
 					.onChange( async ( value ) => {
 						await this.plugin.setCellColorMode( value );
+					} );
+			} );
+
+		new Setting( containerEl )
+			.setName( '標準カラー' )
+			.setDesc( 'Mandala独自色を使うか、Obsidianテーマの背景・セル・文字色に追従するかを選びます。個別に指定した色は優先されます。' )
+			.addDropdown( ( dropdown ) => {
+				dropdown
+					.addOption( 'mandala', 'Mandala独自色' )
+					.addOption( 'obsidian', 'Obsidianテーマに追従' )
+					.setValue( this.plugin.settings.colorSource )
+					.onChange( async ( value ) => {
+						await this.plugin.setColorSource( value );
 					} );
 			} );
 
@@ -1670,6 +1684,7 @@ class MandalaEngineView extends ItemView {
 		container.removeClass( 'mandala-engine-view--theme-auto' );
 		container.removeClass( 'mandala-engine-view--theme-light' );
 		container.removeClass( 'mandala-engine-view--theme-dark' );
+		container.removeClass( 'mandala-engine-view--colors-obsidian' );
 		container.removeClass( 'is-mobile-editing' );
 		container.removeClass( 'is-mobile-grid-zoomed' );
 		container.addClass( 'mandala-engine-view' );
@@ -1711,6 +1726,9 @@ class MandalaEngineView extends ItemView {
 			: this.plugin.settings.themeMode;
 		const resolvedTheme = this.plugin.resolveMandalaTheme( effectiveThemeMode );
 		container.addClass( `mandala-engine-view--theme-${ effectiveThemeMode }` );
+		if ( this.plugin.settings.colorSource === 'obsidian' ) {
+			container.addClass( 'mandala-engine-view--colors-obsidian' );
+		}
 		const mandalaColors = file
 			? this.plugin.getMandalaColors( file, resolvedTheme )
 			: {
@@ -2623,6 +2641,12 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		this.settings.themeMode = [ 'auto', 'light', 'dark' ].includes( mode )
 			? mode
 			: 'auto';
+		await this.saveData( this.settings );
+		await this.refreshViews();
+	}
+
+	async setColorSource( source ) {
+		this.settings.colorSource = source === 'obsidian' ? 'obsidian' : 'mandala';
 		await this.saveData( this.settings );
 		await this.refreshViews();
 	}
