@@ -1036,36 +1036,48 @@ class MandalaEngineView extends ItemView {
 	}
 
 	animateMobileEditorEntry( position ) {
+		const container = this.containerEl.children[ 1 ];
+		const grid = this.containerEl.querySelector( '.mandala-engine-grid' );
 		const cell = this.containerEl.querySelector(
 			`.mandala-engine-cell.is-editing[data-position="${ position }"]`
 		);
-		if ( ! cell || ! this.mobileEditingOrigin ) {
+		if ( ! container || ! grid || ! cell || ! this.mobileEditingOrigin ) {
 			return;
 		}
+		const view = cell.ownerDocument.defaultView;
+		if ( ! view || view.innerWidth > 480 ) {
+			return;
+		}
+		const gridRect = grid.getBoundingClientRect();
 		const target = cell.getBoundingClientRect();
-		if ( ! target.width || ! target.height ) {
+		if ( ! gridRect.width || ! target.width || ! target.height ) {
 			return;
 		}
-		cell.style.setProperty(
-			'--mandala-editor-from-x',
-			`${ this.mobileEditingOrigin.left - target.left }px`
+		const scale = Math.min( 2.3, Math.max( 2.05, view.innerWidth / target.width * 0.68 ) );
+		const targetCenterX = target.left + target.width / 2;
+		const targetCenterY = target.top + target.height / 2;
+		const desiredCenterX = view.innerWidth / 2;
+		const desiredCenterY = Math.min( 340, view.innerHeight * 0.42 );
+		grid.style.setProperty( '--mandala-editor-grid-scale', String( scale ) );
+		grid.style.setProperty(
+			'--mandala-editor-grid-x',
+			`${ desiredCenterX - targetCenterX }px`
 		);
-		cell.style.setProperty(
-			'--mandala-editor-from-y',
-			`${ this.mobileEditingOrigin.top - target.top }px`
+		grid.style.setProperty(
+			'--mandala-editor-grid-y',
+			`${ desiredCenterY - targetCenterY }px`
 		);
-		cell.style.setProperty(
-			'--mandala-editor-from-scale-x',
-			String( this.mobileEditingOrigin.width / target.width )
+		grid.style.setProperty(
+			'--mandala-editor-grid-origin-x',
+			`${ targetCenterX - gridRect.left }px`
 		);
-		cell.style.setProperty(
-			'--mandala-editor-from-scale-y',
-			String( this.mobileEditingOrigin.height / target.height )
+		grid.style.setProperty(
+			'--mandala-editor-grid-origin-y',
+			`${ targetCenterY - gridRect.top }px`
 		);
-		cell.addClass( 'is-mobile-editor-entering' );
 		requestAnimationFrame( () => {
 			requestAnimationFrame( () => {
-				cell.removeClass( 'is-mobile-editor-entering' );
+				container.addClass( 'is-mobile-grid-zoomed' );
 			} );
 		} );
 	}
@@ -1074,13 +1086,8 @@ class MandalaEngineView extends ItemView {
 		if ( this.mobileEditorAnimating || ! this.mobileEditingOrigin ) {
 			return;
 		}
-		const cell = this.containerEl.querySelector( '.mandala-engine-cell.is-editing' );
-		const view = cell && cell.ownerDocument.defaultView;
-		if (
-			! cell
-			|| ! view
-			|| view.getComputedStyle( cell ).position !== 'fixed'
-		) {
+		const container = this.containerEl.children[ 1 ];
+		if ( ! container || ! container.hasClass( 'is-mobile-grid-zoomed' ) ) {
 			return;
 		}
 		this.mobileEditorAnimating = true;
@@ -1088,8 +1095,8 @@ class MandalaEngineView extends ItemView {
 		if ( active && typeof active.blur === 'function' ) {
 			active.blur();
 		}
-		cell.addClass( 'is-mobile-editor-exiting' );
-		await new Promise( ( resolve ) => setTimeout( resolve, 260 ) );
+		container.removeClass( 'is-mobile-grid-zoomed' );
+		await new Promise( ( resolve ) => setTimeout( resolve, 320 ) );
 		this.mobileEditorAnimating = false;
 	}
 
@@ -1595,6 +1602,7 @@ class MandalaEngineView extends ItemView {
 		container.removeClass( 'mandala-engine-view--theme-light' );
 		container.removeClass( 'mandala-engine-view--theme-dark' );
 		container.removeClass( 'is-mobile-editing' );
+		container.removeClass( 'is-mobile-grid-zoomed' );
 		container.addClass( 'mandala-engine-view' );
 		container.addClass( `mandala-engine-view--${ this.mode }` );
 		if ( this.editingPosition !== null ) {

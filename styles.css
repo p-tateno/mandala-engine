@@ -804,8 +804,24 @@
 		transform: none;
 	}
 
+	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-grid {
+		transform: none;
+		transform-origin:
+			var(--mandala-editor-grid-origin-x, 50%)
+			var(--mandala-editor-grid-origin-y, 50%);
+		transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+		will-change: transform;
+	}
+
+	.is-mobile .mandala-engine-view--main.is-mobile-editing.is-mobile-grid-zoomed .mandala-engine-grid {
+		transform: translate(
+			var(--mandala-editor-grid-x, 0),
+			var(--mandala-editor-grid-y, 0)
+		) scale(var(--mandala-editor-grid-scale, 2.2));
+	}
+
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell:not(.is-editing) {
-		opacity: 0.72;
+		opacity: 0.82;
 		filter: none;
 		transition: opacity 220ms ease;
 	}
@@ -816,52 +832,31 @@
 	}
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell.is-editing {
-		position: fixed;
-		top: 160px;
-		right: 12vw;
-		left: 12vw;
-		z-index: 4;
-		width: auto;
-		height: auto;
-		min-height: 0;
+		position: relative;
 		aspect-ratio: 1 / 1;
-		padding: 24px 20px 66px;
+		padding: 14px 12px 38px;
 		overflow: hidden;
-		border-radius: 14px;
+		border-radius: 8px;
 		box-shadow: 0 20px 54px rgb(0 0 0 / 42%);
-		transform: none;
-		transform-origin: top left;
-		transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
-			box-shadow 260ms ease;
-	}
-
-	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell.is-editing.is-mobile-editor-entering,
-	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell.is-editing.is-mobile-editor-exiting {
-		box-shadow: 0 1px 4px color-mix(in srgb, var(--mandala-shadow-color) 45%, transparent);
-		transform: translate(
-			var(--mandala-editor-from-x, 0),
-			var(--mandala-editor-from-y, 0)
-		) scale(
-			var(--mandala-editor-from-scale-x, 1),
-			var(--mandala-editor-from-scale-y, 1)
-		);
 	}
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__note-editor {
-		font-size: clamp(1.25rem, 6vw, 1.65rem);
+		font-size: 0.82rem;
 		line-height: 1.25;
 	}
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__summary-editor {
 		max-height: none;
-		font-size: clamp(1rem, 4.5vw, 1.2rem);
+		font-size: 0.68rem;
 		line-height: 1.5;
 	}
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__actions {
-		right: 18px;
-		bottom: 16px;
-		gap: 10px;
+		right: 8px;
+		bottom: 7px;
+		gap: 6px;
+		transform: scale(0.44);
+		transform-origin: right bottom;
 	}
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__actions button {
