@@ -123,6 +123,25 @@
 	transform: translate(26px, -50%);
 }
 
+.mandala-engine-display-switch::after {
+	position: absolute;
+	top: 50%;
+	left: 16px;
+	z-index: 2;
+	color: var(--text-on-accent);
+	content: 'M';
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1;
+	pointer-events: none;
+	transform: translate(-50%, -50%);
+}
+
+.mandala-engine-display-switch.is-outline-active::after {
+	left: 42px;
+	content: 'O';
+}
+
 .mandala-engine-display-switch__button {
 	position: absolute;
 	top: 50%;
@@ -156,7 +175,7 @@
 
 .mandala-engine-display-switch__button.is-active {
 	background: transparent !important;
-	color: var(--text-on-accent);
+	color: transparent !important;
 }
 
 .mandala-engine-display-switch__button:disabled {
@@ -233,8 +252,8 @@
 	color: var(--mandala-muted-color);
 }
 
-.mandala-engine-outline__row.is-leaf {
-	padding-left: calc(36px + var(--mandala-outline-depth) * 22px);
+.mandala-engine-outline__title:not(.is-expandable) {
+	margin-left: 28px;
 }
 
 .mandala-engine-outline__disclosure svg,
@@ -339,10 +358,6 @@
 	.mandala-engine-outline__row {
 		min-height: 41px;
 		padding-left: calc(2px + var(--mandala-outline-depth) * 16px);
-	}
-
-	.mandala-engine-outline__row.is-leaf {
-		padding-left: calc(30px + var(--mandala-outline-depth) * 16px);
 	}
 
 	.mandala-engine-outline__title {
