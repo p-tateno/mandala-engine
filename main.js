@@ -532,6 +532,7 @@ class MandalaEngineView extends ItemView {
 		this.sourcePath = '';
 		this.track = [];
 		this.draggedCell = null;
+		this.dragPreviewEl = null;
 		this.dragEnterTimer = null;
 		this.dragEnterTargetKey = '';
 		this.dragNavigationInProgress = false;
@@ -964,6 +965,7 @@ class MandalaEngineView extends ItemView {
 			this.suppressCellClick = true;
 			cell.addClass( 'is-reorder-source' );
 			if ( event.dataTransfer ) {
+				this.setRoundedCellDragImage( event, cell );
 				event.dataTransfer.effectAllowed = 'move';
 				event.dataTransfer.setData(
 					'application/x-mandala-cell',
@@ -983,9 +985,50 @@ class MandalaEngineView extends ItemView {
 		} );
 	}
 
+	setRoundedCellDragImage( event, cell ) {
+		if ( ! event.dataTransfer || ! cell ) {
+			return;
+		}
+		if ( this.dragPreviewEl ) {
+			this.dragPreviewEl.remove();
+			this.dragPreviewEl = null;
+		}
+		const rect = cell.getBoundingClientRect();
+		if ( ! rect.width || ! rect.height ) {
+			return;
+		}
+		const preview = cell.cloneNode( true );
+		preview.removeAttribute( 'draggable' );
+		preview.removeClass( 'is-reorder-source' );
+		preview.addClass( 'mandala-engine-cell-drag-preview' );
+		preview.style.width = `${ rect.width }px`;
+		preview.style.height = `${ rect.height }px`;
+		preview.style.position = 'fixed';
+		preview.style.top = '-10000px';
+		preview.style.left = '-10000px';
+		preview.style.margin = '0';
+		preview.style.opacity = '1';
+		preview.style.transform = 'none';
+		cell.ownerDocument.body.appendChild( preview );
+		this.dragPreviewEl = preview;
+		try {
+			event.dataTransfer.setDragImage(
+				preview,
+				Math.round( rect.width / 2 ),
+				Math.round( rect.height / 2 )
+			);
+		} catch ( error ) {
+			console.debug( 'Mandala Engine custom drag image unavailable', error );
+		}
+	}
+
 	clearCellDrag() {
 		this.clearDragEnterTimer();
 		this.draggedCell = null;
+		if ( this.dragPreviewEl ) {
+			this.dragPreviewEl.remove();
+			this.dragPreviewEl = null;
+		}
 		this.forbiddenDragTargetCache.clear();
 		for ( const source of this.containerEl.querySelectorAll( '.is-reorder-source' ) ) {
 			source.removeClass( 'is-reorder-source' );
@@ -1766,6 +1809,7 @@ class MandalaEngineView extends ItemView {
 			this.suppressCellClick = true;
 			cell.addClass( 'is-reorder-source' );
 			if ( event.dataTransfer ) {
+				this.setRoundedCellDragImage( event, cell );
 				event.dataTransfer.effectAllowed = 'move';
 				event.dataTransfer.setData(
 					'application/x-mandala-cell',

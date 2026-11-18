@@ -94,7 +94,8 @@
 }
 
 .mandala-engine-display-switch {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(2, 26px);
 	align-items: center;
 	padding: 2px;
 	border: 1px solid var(--mandala-border-color);
@@ -104,17 +105,23 @@
 }
 
 .mandala-engine-display-switch__button {
-	width: 30px;
-	height: 26px;
-	min-width: 30px;
+	box-sizing: border-box;
+	width: 26px !important;
+	min-width: 26px !important;
+	max-width: 26px !important;
+	height: 26px !important;
+	min-height: 26px !important;
+	max-height: 26px !important;
 	padding: 0;
 	border: 0;
-	border-radius: 999px;
+	border-radius: 50% !important;
+	clip-path: circle(50% at 50% 50%);
 	background: transparent !important;
 	box-shadow: none;
 	color: var(--mandala-muted-color);
-	font-size: 0.72rem;
+	font-size: 0.68rem;
 	font-weight: 700;
+	line-height: 26px;
 }
 
 .mandala-engine-display-switch__button.is-active {
@@ -809,6 +816,13 @@
 	border-radius: 6px;
 	clip-path: inset(0 round 6px);
 	opacity: 0.45;
+}
+
+.mandala-engine-cell-drag-preview {
+	overflow: hidden !important;
+	border-radius: 6px !important;
+	clip-path: inset(0 round 6px);
+	pointer-events: none;
 }
 
 .mandala-engine-cell.is-reorder-target,
