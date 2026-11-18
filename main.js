@@ -550,6 +550,9 @@ class MandalaEngineView extends ItemView {
 		this.mobileClickSuppressTarget = '';
 		this.mobileEditingOrigin = null;
 		this.mobileEditorAnimating = false;
+		this.displayMode = 'mandala';
+		this.outlineExpandedPaths = new Set();
+		this.outlineKnownRoots = new Set();
 	}
 
 	getViewType() {
@@ -572,6 +575,9 @@ class MandalaEngineView extends ItemView {
 			mode: this.mode,
 			sourcePath: this.sourcePath,
 			track: this.track,
+			displayMode: this.displayMode,
+			outlineExpandedPaths: [ ...this.outlineExpandedPaths ],
+			outlineKnownRoots: [ ...this.outlineKnownRoots ],
 		};
 	}
 
@@ -582,6 +588,19 @@ class MandalaEngineView extends ItemView {
 		this.track = state && Array.isArray( state.track )
 			? state.track.filter( ( path ) => typeof path === 'string' )
 			: [];
+		this.displayMode = state && state.displayMode === 'outline'
+			? 'outline'
+			: 'mandala';
+		this.outlineExpandedPaths = new Set(
+			state && Array.isArray( state.outlineExpandedPaths )
+				? state.outlineExpandedPaths.filter( ( path ) => typeof path === 'string' )
+				: []
+		);
+		this.outlineKnownRoots = new Set(
+			state && Array.isArray( state.outlineKnownRoots )
+				? state.outlineKnownRoots.filter( ( path ) => typeof path === 'string' )
+				: []
+		);
 		if ( this.mode === 'main' && this.sourcePath ) {
 			const currentIndex = this.track.indexOf( this.sourcePath );
 			if ( currentIndex >= 0 ) {
@@ -657,6 +676,184 @@ class MandalaEngineView extends ItemView {
 		this.sourcePath = file.path;
 		await this.render();
 		this.finalizeNavigation( file );
+	}
+
+	getOutlineChildren( file ) {
+		if ( ! ( file instanceof TFile ) ) {
+			return [];
+		}
+		const cache = this.app.metadataCache.getFileCache( file );
+		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
+		const children = [];
+		for ( let position = 1; position <= 8; position += 1 ) {
+			const link = this.plugin.cleanLink( frontmatter[ `mandala_${ position }` ] || '' );
+			if ( ! link ) {
+				continue;
+			}
+			const linkedFile = this.app.metadataCache.getFirstLinkpathDest( link, file.path );
+			if ( ! ( linkedFile instanceof TFile ) || linkedFile.extension !== 'md' ) {
+				continue;
+			}
+			children.push( {
+				position,
+				file: linkedFile,
+				connectionType: this.plugin.getCellConnectionType(
+					frontmatter,
+					position,
+					linkedFile
+				),
+			} );
+		}
+		return children;
+	}
+
+	async createOutlineNode( parent, entry, depth, activePath, visited, treePath ) {
+		const { file, position = 0, connectionType = 'child' } = entry;
+		const cache = this.app.metadataCache.getFileCache( file );
+		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
+		const role = String( frontmatter.mandala_role || '' ).trim().toLowerCase();
+		const isRoot = position === 0;
+		const isMandalaRoot = role === 'root' || this.plugin.isLegacyRootFile( file );
+		const isMandala = isRoot || connectionType !== 'reference' || isMandalaRoot;
+		const repeated = visited.has( file.path );
+		const childEntries = isMandala && ! repeated
+			? this.getOutlineChildren( file )
+			: [];
+		const expandable = childEntries.length > 0;
+		const expanded = expandable && this.outlineExpandedPaths.has( file.path );
+		const item = parent.createDiv( 'mandala-engine-outline__item' );
+		const row = item.createDiv( {
+			cls: `mandala-engine-outline__row${ file.path === activePath ? ' is-active' : '' }${ depth === 0 ? ' is-root' : '' }${ depth >= 2 ? ' is-depth-3-or-more' : '' }`,
+		} );
+		row.style.setProperty( '--mandala-outline-depth', String( depth ) );
+		const toggleExpanded = () => {
+			if ( ! expandable ) {
+				return;
+			}
+			if ( expanded ) {
+				this.outlineExpandedPaths.delete( file.path );
+			} else {
+				this.outlineExpandedPaths.add( file.path );
+			}
+			this.app.workspace.requestSaveLayout();
+			void this.render();
+		};
+
+		const disclosure = row.createEl( 'button', {
+			cls: `mandala-engine-outline__disclosure clickable-icon${ expandable ? '' : ' is-empty' }`,
+			attr: {
+				type: 'button',
+				'aria-label': expanded ? '折りたたむ' : '展開する',
+				'aria-expanded': expanded ? 'true' : 'false',
+			},
+		} );
+		if ( expandable ) {
+			setIcon( disclosure, expanded ? 'chevron-down' : 'chevron-right' );
+			disclosure.addEventListener( 'click', ( event ) => {
+				event.preventDefault();
+				event.stopPropagation();
+				toggleExpanded();
+			} );
+		}
+
+		const titleOptions = {
+			text: this.plugin.getMandalaTitle( file ),
+			cls: `mandala-engine-outline__title${ expandable ? ' is-expandable' : '' } is-mandala-navigable`,
+		};
+		const title = expandable
+			? row.createEl( 'button', {
+				...titleOptions,
+				attr: {
+					type: 'button',
+					'aria-expanded': expanded ? 'true' : 'false',
+				},
+			} )
+			: row.createSpan( titleOptions );
+		title.addEventListener( 'click', async ( event ) => {
+			if ( event.altKey ) {
+				event.preventDefault();
+				event.stopPropagation();
+				this.displayMode = 'mandala';
+				await this.navigateToTrack( file, treePath );
+				return;
+			}
+			if ( expandable ) {
+				event.preventDefault();
+				event.stopPropagation();
+				toggleExpanded();
+			}
+		} );
+		if ( repeated ) {
+			item.addClass( 'is-repeated' );
+			title.setAttr( 'aria-label', 'すでに表示済みのノート' );
+		}
+		const summary = String( frontmatter.mandala_summary || '' ).trim();
+		if ( summary ) {
+			row.createSpan( {
+				text: summary,
+				cls: 'mandala-engine-outline__summary',
+			} );
+		}
+		const showsMarkdownIcon = connectionType === 'reference'
+			|| await this.hasMarkdownBody( file );
+		if ( showsMarkdownIcon ) {
+			const open = row.createEl( 'button', {
+				cls: 'mandala-engine-outline__file-open clickable-icon',
+				attr: {
+					type: 'button',
+					'aria-label': 'Markdownを開く',
+				},
+			} );
+			setIcon( open, 'file-text' );
+			open.addEventListener( 'click', async ( event ) => {
+				event.preventDefault();
+				event.stopPropagation();
+				await this.openMarkdownFile( file );
+			} );
+		}
+
+		if ( ! expanded ) {
+			return;
+		}
+		const nextVisited = new Set( visited );
+		nextVisited.add( file.path );
+		const children = item.createDiv( 'mandala-engine-outline__children' );
+		for ( const child of childEntries ) {
+			await this.createOutlineNode(
+				children,
+				child,
+				depth + 1,
+				activePath,
+				nextVisited,
+				[ ...treePath, child.file.path ]
+			);
+		}
+	}
+
+	async renderOutline( workspace, currentFile ) {
+		const rootPath = this.track.length ? this.track[ 0 ] : '';
+		const trackRoot = rootPath
+			? this.app.vault.getAbstractFileByPath( rootPath )
+			: null;
+		const rootFile = trackRoot instanceof TFile
+			? trackRoot
+			: this.plugin.getMandalaRootFile( currentFile );
+		if ( ! ( rootFile instanceof TFile ) ) {
+			return;
+		}
+		if ( ! this.outlineKnownRoots.has( rootFile.path ) ) {
+			this.outlineKnownRoots.add( rootFile.path );
+			this.outlineExpandedPaths.add( rootFile.path );
+		}
+		const outline = workspace.createDiv( 'mandala-engine-outline' );
+		await this.createOutlineNode(
+			outline,
+			{ file: rootFile, position: 0, connectionType: 'child' },
+			0,
+			currentFile.path,
+			new Set(),
+			[ rootFile.path ]
+		);
 	}
 
 	clearDragEnterTimer() {
@@ -1654,6 +1851,8 @@ class MandalaEngineView extends ItemView {
 		this.registerEvent(
 			this.app.metadataCache.on( 'changed', ( changedFile ) => {
 				if (
+					this.displayMode === 'outline'
+					||
 					changedFile === this.getCurrentFile()
 					|| this.isFileLinkedFromCurrentMandala( changedFile )
 				) {
@@ -1687,6 +1886,7 @@ class MandalaEngineView extends ItemView {
 		container.removeClass( 'mandala-engine-view--colors-obsidian' );
 		container.removeClass( 'is-mobile-editing' );
 		container.removeClass( 'is-mobile-grid-zoomed' );
+		container.removeClass( 'is-outline-view' );
 		container.addClass( 'mandala-engine-view' );
 		container.addClass( `mandala-engine-view--${ this.mode }` );
 		if ( this.editingPosition !== null ) {
@@ -1782,6 +1982,42 @@ class MandalaEngineView extends ItemView {
 		header.createEl( 'strong', {
 			text: file ? this.plugin.getMandalaTitle( file ) : 'Mandala Engine',
 		} );
+		if ( this.mode === 'main' ) {
+			const displaySwitch = header.createDiv( 'mandala-engine-display-switch' );
+			for ( const [ value, label, ariaLabel ] of [
+				[ 'mandala', 'M', 'Mandala表示' ],
+				[ 'outline', 'O', 'アウトライン表示' ],
+			] ) {
+				const button = displaySwitch.createEl( 'button', {
+					text: label,
+					cls: `mandala-engine-display-switch__button${ this.displayMode === value ? ' is-active' : '' }`,
+					attr: {
+						type: 'button',
+						'aria-label': ariaLabel,
+						'aria-pressed': this.displayMode === value ? 'true' : 'false',
+					},
+				} );
+				button.disabled = this.editingPosition !== null;
+				button.addEventListener( 'click', async ( event ) => {
+					event.preventDefault();
+					event.stopPropagation();
+					if ( this.displayMode === value || this.editingPosition !== null ) {
+						return;
+					}
+					this.displayMode = value;
+					if ( value === 'outline' ) {
+						for ( const path of this.track ) {
+							this.outlineExpandedPaths.add( path );
+						}
+					}
+					this.paletteOpen = false;
+					this.clearCellDrag();
+					this.clearMobileTouchGesture();
+					await this.render();
+					this.app.workspace.requestSaveLayout();
+				} );
+			}
+		}
 		const palette = header.createDiv( {
 			cls: `mandala-engine-palette${ this.paletteOpen ? ' is-open' : '' }`,
 		} );
@@ -1845,7 +2081,7 @@ class MandalaEngineView extends ItemView {
 			} );
 			return;
 		}
-		if ( this.mode === 'main' ) {
+		if ( this.mode === 'main' && this.displayMode === 'mandala' ) {
 			this.registerBackgroundImageDrop( container, file );
 		}
 
@@ -2009,7 +2245,7 @@ class MandalaEngineView extends ItemView {
 
 		const cache = this.app.metadataCache.getFileCache( file );
 		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
-		if ( this.mode === 'main' ) {
+		if ( this.mode === 'main' && this.displayMode === 'mandala' ) {
 			const portraitNotice = container.createDiv( 'mandala-engine-portrait-notice' );
 			portraitNotice.createEl( 'strong', { text: '縦向きでお使いください' } );
 			portraitNotice.createEl( 'span', { text: 'iPhoneを縦向きにするとマンダラを表示します。' } );
@@ -2017,6 +2253,11 @@ class MandalaEngineView extends ItemView {
 		const workspace = this.mode === 'main'
 			? container.createDiv( 'mandala-engine-workspace' )
 			: container;
+		if ( this.mode === 'main' && this.displayMode === 'outline' ) {
+			container.addClass( 'is-outline-view' );
+			await this.renderOutline( workspace, file );
+			return;
+		}
 
 		if ( this.mode === 'main' ) {
 			const validTrack = this.track.filter( ( path ) => {

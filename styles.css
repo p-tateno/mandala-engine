@@ -83,6 +83,9 @@
 	top: 12px;
 	right: 12px;
 	z-index: 2;
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	margin: 0;
 }
 
@@ -90,11 +93,207 @@
 	display: none;
 }
 
+.mandala-engine-display-switch {
+	display: flex;
+	align-items: center;
+	padding: 2px;
+	border: 1px solid var(--mandala-border-color);
+	border-radius: 999px;
+	background: var(--mandala-panel-color);
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--mandala-shadow-color) 45%, transparent);
+}
+
+.mandala-engine-display-switch__button {
+	width: 30px;
+	height: 26px;
+	min-width: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: transparent !important;
+	box-shadow: none;
+	color: var(--mandala-muted-color);
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+
+.mandala-engine-display-switch__button.is-active {
+	background: var(--interactive-accent) !important;
+	color: var(--text-on-accent);
+}
+
+.mandala-engine-display-switch__button:disabled {
+	opacity: 0.55;
+}
+
 .mandala-engine-workspace {
 	position: relative;
 	z-index: 1;
 	width: min(100%, 70vh, 920px);
 	margin: auto;
+}
+
+.mandala-engine-view--main.is-outline-view {
+	align-items: flex-start;
+	padding-top: clamp(72px, 10vh, 120px);
+	padding-bottom: 48px;
+	scrollbar-gutter: stable both-edges;
+}
+
+.mandala-engine-view--main.is-outline-view .mandala-engine-workspace {
+	width: min(100%, 760px);
+	margin-top: 0;
+}
+
+.mandala-engine-outline {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	padding: 8px 0 24px;
+	color: var(--mandala-text-color);
+}
+
+.mandala-engine-outline__row {
+	display: flex;
+	align-items: center;
+	min-height: 38px;
+	margin: 1px 0;
+	padding: 4px 10px 4px calc(8px + var(--mandala-outline-depth) * 22px);
+	border-radius: 8px;
+	color: var(--mandala-text-color);
+	transition: background 120ms ease;
+}
+
+.mandala-engine-outline__row:hover {
+	background: transparent;
+}
+
+.mandala-engine-outline__row.is-active {
+	background: transparent;
+	box-shadow: none;
+}
+
+.mandala-engine-outline__disclosure {
+	display: inline-flex;
+	flex: 0 0 28px;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 30px;
+	min-width: 28px;
+	padding: 0;
+	border: 0;
+	background: transparent !important;
+	box-shadow: none;
+	color: var(--mandala-muted-color);
+}
+
+.mandala-engine-outline__disclosure.is-empty {
+	visibility: hidden;
+}
+
+.mandala-engine-outline__disclosure svg,
+.mandala-engine-outline__file-open svg {
+	width: 17px;
+	height: 17px;
+}
+
+.mandala-engine-outline__file-open {
+	display: inline-flex;
+	flex: 0 0 28px;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	min-width: 28px;
+	margin-left: 4px;
+	padding: 0;
+	border: 0;
+	background: transparent !important;
+	box-shadow: none;
+	color: var(--mandala-muted-color);
+	opacity: 0;
+	pointer-events: none;
+	transition: color 130ms ease, opacity 130ms ease;
+}
+
+.mandala-engine-outline__row:hover .mandala-engine-outline__file-open,
+.mandala-engine-outline__row:focus-within .mandala-engine-outline__file-open {
+	opacity: 0.38;
+	pointer-events: auto;
+}
+
+.mandala-engine-outline__file-open:hover,
+.mandala-engine-outline__file-open:focus {
+	color: var(--text-normal);
+	opacity: 1 !important;
+}
+
+.mandala-engine-outline__title {
+	flex: 0 1 auto;
+	min-width: 0;
+	height: auto;
+	padding: 3px 6px;
+	overflow: hidden;
+	border: 0;
+	background: transparent !important;
+	box-shadow: none;
+	color: inherit !important;
+	font-size: 0.85rem;
+	font-weight: 550;
+	text-align: left;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mandala-engine-outline__summary {
+	flex: 0 1 auto;
+	min-width: 0;
+	margin-left: 10px;
+	overflow: hidden;
+	color: var(--mandala-muted-color);
+	font-size: 0.82rem;
+	font-weight: 400;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mandala-engine-outline__title.is-expandable {
+	cursor: pointer;
+}
+
+.mandala-engine-outline__row.is-depth-3-or-more .mandala-engine-outline__title {
+	font-weight: 400;
+}
+
+.mandala-engine-outline__row.is-root .mandala-engine-outline__title {
+	font-size: 1.02rem;
+}
+
+.mandala-engine-outline__item.is-repeated > .mandala-engine-outline__row {
+	opacity: 0.58;
+}
+
+@media (hover: none) {
+	.mandala-engine-outline__file-open {
+		opacity: 0.5;
+		pointer-events: auto;
+	}
+}
+
+@media (max-width: 480px) {
+	.mandala-engine-view--main.is-outline-view {
+		padding: 68px 12px 36px;
+	}
+
+	.mandala-engine-outline__row {
+		min-height: 41px;
+		padding-left: calc(2px + var(--mandala-outline-depth) * 16px);
+	}
+
+	.mandala-engine-outline__title {
+		font-size: 0.85rem;
+	}
 }
 
 .mandala-engine-view--main .mandala-engine-grid {
