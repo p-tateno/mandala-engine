@@ -2019,7 +2019,7 @@ class MandalaEngineView extends ItemView {
 			}
 		}
 		const palette = header.createDiv( {
-			cls: `mandala-engine-palette${ this.paletteOpen ? ' is-open' : '' }`,
+			cls: `mandala-engine-palette${ this.paletteOpen ? ' is-open' : '' }${ this.mode === 'main' && this.displayMode === 'outline' ? ' is-outline-hidden' : '' }`,
 		} );
 		const paletteToggle = palette.createEl( 'button', {
 			cls: 'mandala-engine-palette__toggle clickable-icon',
