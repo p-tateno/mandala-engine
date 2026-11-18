@@ -741,7 +741,7 @@ class MandalaEngineView extends ItemView {
 		};
 
 		const disclosure = row.createEl( 'button', {
-			cls: `mandala-engine-outline__disclosure clickable-icon${ expandable ? '' : ' is-empty' }`,
+			cls: `mandala-engine-outline__disclosure clickable-icon${ expandable ? '' : ' is-placeholder' }`,
 			attr: {
 				type: 'button',
 				'aria-label': expanded ? '折りたたむ' : '展開する',
@@ -2030,7 +2030,9 @@ class MandalaEngineView extends ItemView {
 			text: file ? this.plugin.getMandalaTitle( file ) : 'Mandala Engine',
 		} );
 		if ( this.mode === 'main' ) {
-			const displaySwitch = header.createDiv( 'mandala-engine-display-switch' );
+			const displaySwitch = header.createDiv(
+				`mandala-engine-display-switch is-${ this.displayMode }-active`
+			);
 			for ( const [ value, label, ariaLabel ] of [
 				[ 'mandala', 'M', 'Mandala表示' ],
 				[ 'outline', 'O', 'アウトライン表示' ],
