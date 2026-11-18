@@ -724,7 +724,7 @@ class MandalaEngineView extends ItemView {
 		const expanded = expandable && this.outlineExpandedPaths.has( file.path );
 		const item = parent.createDiv( 'mandala-engine-outline__item' );
 		const row = item.createDiv( {
-			cls: `mandala-engine-outline__row${ file.path === activePath ? ' is-active' : '' }${ depth === 0 ? ' is-root' : '' }${ depth >= 2 ? ' is-depth-3-or-more' : '' }`,
+			cls: `mandala-engine-outline__row${ file.path === activePath ? ' is-active' : '' }${ depth === 0 ? ' is-root' : '' }${ depth >= 2 ? ' is-depth-3-or-more' : '' }${ expandable ? ' is-expandable' : ' is-leaf' }`,
 		} );
 		row.style.setProperty( '--mandala-outline-depth', String( depth ) );
 		const toggleExpanded = () => {
@@ -740,24 +740,21 @@ class MandalaEngineView extends ItemView {
 			void this.render();
 		};
 
-		const disclosure = row.createEl( 'button', {
-			cls: `mandala-engine-outline__disclosure clickable-icon${ expandable ? '' : ' is-placeholder' }`,
-			attr: {
-				type: 'button',
-				'aria-label': expanded ? '折りたたむ' : '展開する',
-				'aria-expanded': expanded ? 'true' : 'false',
-			},
-		} );
 		if ( expandable ) {
+			const disclosure = row.createEl( 'button', {
+				cls: 'mandala-engine-outline__disclosure clickable-icon',
+				attr: {
+					type: 'button',
+					'aria-label': expanded ? '折りたたむ' : '展開する',
+					'aria-expanded': expanded ? 'true' : 'false',
+				},
+			} );
 			setIcon( disclosure, expanded ? 'chevron-down' : 'chevron-right' );
 			disclosure.addEventListener( 'click', ( event ) => {
 				event.preventDefault();
 				event.stopPropagation();
 				toggleExpanded();
 			} );
-		} else {
-			// Keep a real icon-sized placeholder so iPad does not collapse an empty button.
-			setIcon( disclosure, 'chevron-right' );
 		}
 
 		const titleOptions = {

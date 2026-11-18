@@ -95,10 +95,11 @@
 
 .mandala-engine-display-switch {
 	position: relative;
-	display: grid;
-	grid-template-columns: repeat(2, 26px);
-	align-items: center;
-	padding: 2px;
+	display: block;
+	box-sizing: border-box;
+	width: 58px;
+	height: 32px;
+	padding: 0;
 	border: 1px solid var(--mandala-border-color);
 	border-radius: 999px;
 	background: var(--mandala-panel-color);
@@ -123,7 +124,8 @@
 }
 
 .mandala-engine-display-switch__button {
-	position: relative;
+	position: absolute;
+	top: 50%;
 	z-index: 1;
 	box-sizing: border-box;
 	width: 26px !important;
@@ -141,6 +143,15 @@
 	font-size: 0.68rem;
 	font-weight: 700;
 	line-height: 26px;
+	transform: translateY(-50%);
+}
+
+.mandala-engine-display-switch__button:first-of-type {
+	left: 3px;
+}
+
+.mandala-engine-display-switch__button:last-of-type {
+	left: 29px;
 }
 
 .mandala-engine-display-switch__button.is-active {
@@ -222,9 +233,8 @@
 	color: var(--mandala-muted-color);
 }
 
-.mandala-engine-outline__disclosure.is-placeholder {
-	display: inline-flex !important;
-	visibility: hidden;
+.mandala-engine-outline__row.is-leaf {
+	padding-left: calc(36px + var(--mandala-outline-depth) * 22px);
 }
 
 .mandala-engine-outline__disclosure svg,
@@ -329,6 +339,10 @@
 	.mandala-engine-outline__row {
 		min-height: 41px;
 		padding-left: calc(2px + var(--mandala-outline-depth) * 16px);
+	}
+
+	.mandala-engine-outline__row.is-leaf {
+		padding-left: calc(30px + var(--mandala-outline-depth) * 16px);
 	}
 
 	.mandala-engine-outline__title {
