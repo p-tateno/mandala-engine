@@ -105,6 +105,8 @@
 }
 
 .mandala-engine-display-switch__button {
+	position: relative;
+	isolation: isolate;
 	box-sizing: border-box;
 	width: 26px !important;
 	min-width: 26px !important;
@@ -115,7 +117,6 @@
 	padding: 0;
 	border: 0;
 	border-radius: 50% !important;
-	clip-path: circle(50% at 50% 50%);
 	background: transparent !important;
 	box-shadow: none;
 	color: var(--mandala-muted-color);
@@ -125,8 +126,21 @@
 }
 
 .mandala-engine-display-switch__button.is-active {
-	background: var(--interactive-accent) !important;
+	background: transparent !important;
 	color: var(--text-on-accent);
+}
+
+.mandala-engine-display-switch__button.is-active::before {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	z-index: -1;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: var(--interactive-accent);
+	content: '';
+	transform: translate(-50%, -50%);
 }
 
 .mandala-engine-display-switch__button:disabled {

@@ -755,6 +755,9 @@ class MandalaEngineView extends ItemView {
 				event.stopPropagation();
 				toggleExpanded();
 			} );
+		} else {
+			// Keep a real icon-sized placeholder so iPad does not collapse an empty button.
+			setIcon( disclosure, 'chevron-right' );
 		}
 
 		const titleOptions = {
