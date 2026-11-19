@@ -1111,6 +1111,8 @@ class MandalaEngineView extends ItemView {
 			return;
 		}
 		const preview = cell.cloneNode( true );
+		const ownerWindow = cell.ownerDocument.defaultView;
+		const computedStyle = ownerWindow ? ownerWindow.getComputedStyle( cell ) : null;
 		preview.removeAttribute( 'draggable' );
 		preview.removeClass( 'is-reorder-source' );
 		preview.addClass( 'mandala-engine-cell-drag-preview' );
@@ -1122,6 +1124,14 @@ class MandalaEngineView extends ItemView {
 		preview.style.margin = '0';
 		preview.style.opacity = '1';
 		preview.style.transform = 'none';
+		if ( computedStyle ) {
+			preview.style.backgroundColor = computedStyle.backgroundColor;
+			preview.style.backgroundImage = computedStyle.backgroundImage;
+			preview.style.border = computedStyle.border;
+			preview.style.borderRadius = computedStyle.borderRadius;
+			preview.style.boxShadow = computedStyle.boxShadow;
+			preview.style.color = computedStyle.color;
+		}
 		cell.ownerDocument.body.appendChild( preview );
 		this.dragPreviewEl = preview;
 		try {
@@ -1346,6 +1356,14 @@ class MandalaEngineView extends ItemView {
 			return null;
 		}
 		const title = cell.createEl( 'h3', { text } );
+		this.createMarkdownOpenButton( cell, file );
+		return title;
+	}
+
+	createMarkdownOpenButton( cell, file ) {
+		if ( ! ( file instanceof TFile ) ) {
+			return null;
+		}
 		const open = cell.createEl( 'button', {
 			cls: 'mandala-engine-cell__reference-open clickable-icon',
 			attr: {
@@ -1362,7 +1380,7 @@ class MandalaEngineView extends ItemView {
 			event.stopPropagation();
 			await this.openMarkdownFile( file );
 		} );
-		return title;
+		return open;
 	}
 
 	async hasMarkdownBody( file ) {
@@ -2483,31 +2501,40 @@ class MandalaEngineView extends ItemView {
 					cls: 'mandala-engine-track__item',
 				} );
 				if ( index === 0 ) {
-					const rootButton = item.createEl( 'button', {
-						cls: 'mandala-engine-track__button mandala-engine-track__root-switcher',
+					const rootSwitcher = item.createSpan( {
+						cls: 'mandala-engine-track__root-switcher',
+					} );
+					const rootButton = rootSwitcher.createEl( 'button', {
+						text: this.plugin.getMandalaTitle( trackFile ),
+						cls: 'mandala-engine-track__button mandala-engine-track__root-home',
 						attr: {
 							type: 'button',
-							'aria-label': '別のMandalaへ移動',
-							'aria-haspopup': 'menu',
+							'aria-label': `${ this.plugin.getMandalaTitle( trackFile ) }のルートへ戻る`,
 							...( index === this.track.length - 1
 								? { 'aria-current': 'page' }
 								: {} ),
 						},
 					} );
-					rootButton.createSpan( {
-						text: this.plugin.getMandalaTitle( trackFile ),
-						cls: 'mandala-engine-track__root-title',
+					rootButton.addEventListener( 'click', () => this.navigateTo( trackFile ) );
+					const rootMenuButton = rootSwitcher.createEl( 'button', {
+						cls: 'mandala-engine-track__root-menu',
+						attr: {
+							type: 'button',
+							'aria-label': '別のMandalaへ移動',
+							'aria-haspopup': 'menu',
+						},
 					} );
-					rootButton.createSpan( {
-						text: '⌄',
+					const rootChevron = rootMenuButton.createSpan( {
 						cls: 'mandala-engine-track__root-chevron',
 					} );
-					rootButton.addEventListener( 'click', ( event ) => {
+					setIcon( rootChevron, 'chevron-down' );
+					rootMenuButton.addEventListener( 'click', ( event ) => {
 						this.showMandalaRootMenu( event, trackFile );
 					} );
 				} else if ( index === this.track.length - 1 ) {
 					item.createEl( 'span', {
 						text: this.plugin.getMandalaTitle( trackFile ),
+						cls: 'mandala-engine-track__current',
 						attr: { 'aria-current': 'page' },
 					} );
 				} else {
@@ -2670,6 +2697,10 @@ class MandalaEngineView extends ItemView {
 							? 'mandala-engine-cell__summary--short'
 							: '',
 					} );
+				}
+				if ( await this.hasMarkdownBody( file ) ) {
+					cell.addClass( 'is-reference-document' );
+					this.createMarkdownOpenButton( cell, file );
 				}
 
 				const parent = this.plugin.getMandalaParentLink( frontmatter, file );
@@ -3937,8 +3968,12 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		return this.app.vault.createFolder( MANDALA_FOLDER );
 	}
 
-	getAvailableMandalaPath( file, title ) {
-		const base = this.getSafeFilePart( title, 100 );
+	getAvailableMandalaPath( file, title, date = '' ) {
+		const titlePart = this.getSafeFilePart( title, 100 );
+		const cleanDate = /^\d{4}-\d{2}-\d{2}$/.test( String( date || '' ) )
+			? String( date )
+			: '';
+		const base = cleanDate ? `${ titlePart } ${ cleanDate }` : titlePart;
 		let path = `${ MANDALA_FOLDER }/${ base }.md`;
 		let suffix = 2;
 		while ( path !== file?.path && this.app.vault.getAbstractFileByPath( path ) ) {
@@ -3972,7 +4007,14 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		}
 		await this.ensureMandalaFolder();
 		const oldPath = file.path;
-		const newPath = this.getAvailableMandalaPath( file, title );
+		const datedName = file.basename.match(
+			/\s(\d{4}-\d{2}-\d{2})(?: \d+)?$/
+		);
+		const newPath = this.getAvailableMandalaPath(
+			file,
+			title,
+			datedName ? datedName[ 1 ] : ''
+		);
 		if ( newPath !== oldPath ) {
 			await this.app.fileManager.renameFile( file, newPath );
 			this.metadataCheckedPaths.delete( oldPath );
@@ -4544,11 +4586,16 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		if ( ! linkedFile ) {
 			resolvedConnectionType = 'child';
 			await this.ensureMandalaFolder();
-			const newPath = this.getAvailableMandalaPath( null, cleanTitle );
+			const createdDate = this.getLocalDate();
+			const newPath = this.getAvailableMandalaPath(
+				null,
+				cleanTitle,
+				createdDate
+			);
 			const body = [
 				'---',
 				`mandala_title: ${ JSON.stringify( cleanTitle ) }`,
-				`created: ${ this.getLocalDate() }`,
+				`created: ${ createdDate }`,
 				'mandala_role: child',
 				`mandala_parent: ${ JSON.stringify( this.getMandalaLink( sourceFile ) ) }`,
 				`mandala_summary: ${ JSON.stringify( summary || '' ) }`,
