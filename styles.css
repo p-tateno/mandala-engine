@@ -787,8 +787,8 @@
 
 .mandala-engine-cell__actions button {
 	height: auto;
-	padding: 3px 8px;
-	font-size: 0.72rem;
+	padding: 3px 7px;
+	font-size: 0.64rem;
 }
 
 .mandala-engine-cell h3 {
@@ -807,6 +807,11 @@
 .mandala-engine-cell p {
 	margin: 0;
 	font-size: clamp(0.68rem, 1.6vw, 0.9rem);
+}
+
+.mandala-engine-cell p.mandala-engine-cell__summary--short {
+	width: 100%;
+	text-align: center;
 }
 
 .mandala-engine-view--main .mandala-engine-cell p {
@@ -885,6 +890,19 @@
 	justify-content: flex-end;
 	gap: 8px;
 	margin-top: 20px;
+}
+
+.mandala-engine-delete-modal__actions button.mod-warning {
+	border-color: transparent;
+	background: var(--color-red, #c83c3c);
+	color: #fff;
+	font-weight: 600;
+}
+
+.mandala-engine-delete-modal__actions button.mod-warning:hover,
+.mandala-engine-delete-modal__actions button.mod-warning:focus-visible {
+	background: color-mix(in srgb, var(--color-red, #c83c3c) 82%, #000);
+	color: #fff;
 }
 
 .mandala-engine-palette__about {
@@ -1032,7 +1050,8 @@
 
 .is-mobile .mandala-engine-cell__actions button {
 	min-height: 30px;
-	padding: 5px 8px;
+	padding: 5px 7px;
+	font-size: 0.64rem;
 }
 
 .is-mobile .mandala-engine-view.is-mobile-move-mode .mandala-engine-cell:not(.is-mobile-move-source):not(.mandala-engine-cell--center) {
@@ -1189,9 +1208,9 @@
 
 	.is-mobile .mandala-engine-view--main.is-mobile-editing .mandala-engine-cell__actions button {
 		min-height: 44px;
-		padding: 8px 16px;
+		padding: 8px 12px;
 		border-radius: 999px;
-		font-size: 1rem;
+		font-size: 0.82rem;
 	}
 
 	.mandala-engine-track {

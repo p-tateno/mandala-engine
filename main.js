@@ -160,6 +160,93 @@ class DeleteLinkedFileModal extends Modal {
 	}
 }
 
+class DeleteSharedFileModal extends Modal {
+	constructor( app, plugin, file, onClear, onDeleted ) {
+		super( app );
+		this.plugin = plugin;
+		this.file = file;
+		this.onClear = onClear;
+		this.onDeleted = onDeleted;
+	}
+
+	onOpen() {
+		this.renderChoice();
+	}
+
+	renderChoice() {
+		const { contentEl } = this;
+		const sharedCells = this.plugin.getCellReferencesToPaths( [ this.file.path ] );
+		contentEl.empty();
+		contentEl.addClass( 'mandala-engine-delete-modal' );
+		contentEl.createEl( 'h2', {
+			text: '共有セルをどうしますか？',
+		} );
+		contentEl.createEl( 'p', {
+			text: `「${ this.file.basename }」は${ sharedCells.length }か所のセルで使用されています。`,
+		} );
+
+		const actions = contentEl.createDiv( 'mandala-engine-delete-modal__actions' );
+		const cancel = actions.createEl( 'button', { text: 'キャンセル' } );
+		cancel.addEventListener( 'click', () => this.close() );
+		const clear = actions.createEl( 'button', {
+			text: 'このセルだけクリア',
+			cls: 'mod-cta',
+		} );
+		clear.addEventListener( 'click', async () => {
+			cancel.disabled = true;
+			clear.disabled = true;
+			remove.disabled = true;
+			await this.onClear();
+			this.close();
+		} );
+		const remove = actions.createEl( 'button', {
+			text: 'すべて削除へ',
+			cls: 'mod-warning',
+		} );
+		remove.addEventListener( 'click', () => this.renderDeleteConfirmation() );
+	}
+
+	renderDeleteConfirmation() {
+		const { contentEl } = this;
+		const deletePlan = this.plugin.getMandalaBranchDeletePlan( this.file );
+		const plan = deletePlan.length ? deletePlan : [ this.file.path ];
+		const sharedCells = this.plugin.getCellReferencesToPaths( [ this.file.path ] );
+		contentEl.empty();
+		contentEl.addClass( 'mandala-engine-delete-modal' );
+		contentEl.createEl( 'h2', {
+			text: '共有するすべてのセルから削除しますか？',
+		} );
+		contentEl.createEl( 'p', {
+			text: `${ sharedCells.length }か所のセルから削除し、MDノートをObsidianのゴミ箱へ移動します。`,
+		} );
+		if ( plan.length > 1 ) {
+			contentEl.createEl( 'p', {
+				text: `このセル以下のMandalaファイル${ plan.length }件も削除されます。`,
+			} );
+		}
+		const actions = contentEl.createDiv( 'mandala-engine-delete-modal__actions' );
+		const back = actions.createEl( 'button', { text: '戻る' } );
+		back.addEventListener( 'click', () => this.renderChoice() );
+		const confirm = actions.createEl( 'button', {
+			text: 'すべて削除',
+			cls: 'mod-warning',
+		} );
+		confirm.addEventListener( 'click', async () => {
+			back.disabled = true;
+			confirm.disabled = true;
+			const removed = await this.plugin.deleteSharedMandalaFiles( plan );
+			if ( removed ) {
+				await this.onDeleted();
+			}
+			this.close();
+		} );
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
 class UnsavedChangesModal extends Modal {
 	constructor( app, onSave, onDiscard ) {
 		super( app );
@@ -795,8 +882,10 @@ class MandalaEngineView extends ItemView {
 				cls: 'mandala-engine-outline__summary',
 			} );
 		}
-		const showsMarkdownIcon = connectionType === 'reference'
-			|| await this.hasMarkdownBody( file );
+		const showsMarkdownIcon = (
+			connectionType === 'reference'
+			&& ! this.plugin.isMandalaStructureFile( file )
+		) || await this.hasMarkdownBody( file );
 		if ( showsMarkdownIcon ) {
 			const open = row.createEl( 'button', {
 				cls: 'mandala-engine-outline__file-open clickable-icon',
@@ -960,13 +1049,14 @@ class MandalaEngineView extends ItemView {
 				position: parentPosition,
 				linkedPath: centerFile.path,
 				fromCenter: true,
+				shareMode: event.altKey,
 			};
 			this.dragLastActivity = Date.now();
 			this.suppressCellClick = true;
 			cell.addClass( 'is-reorder-source' );
 			if ( event.dataTransfer ) {
 				this.setRoundedCellDragImage( event, cell );
-				event.dataTransfer.effectAllowed = 'move';
+				event.dataTransfer.effectAllowed = 'copyMove';
 				event.dataTransfer.setData(
 					'application/x-mandala-cell',
 					JSON.stringify( this.draggedCell )
@@ -1267,6 +1357,16 @@ class MandalaEngineView extends ItemView {
 			console.error( 'Mandala Engine body check failed:', error );
 			return false;
 		}
+	}
+
+	isShortCellSummary( value ) {
+		const summary = String( value || '' ).trim();
+		const visualLength = Array.from( summary ).reduce( ( total, character ) => (
+			total + ( /[\u0000-\u00ff\uff61-\uff9f]/.test( character ) ? 0.5 : 1 )
+		), 0 );
+		return summary.length > 0
+			&& ! /[\r\n]/.test( summary )
+			&& visualLength <= 12;
 	}
 
 	isFileLinkedFromCurrentMandala( linkedFile ) {
@@ -1710,7 +1810,8 @@ class MandalaEngineView extends ItemView {
 			) {
 				return;
 			}
-			if ( this.isForbiddenDragTarget( sourceFile ) ) {
+			const shareRequested = Boolean( this.draggedCell.shareMode || event.altKey );
+			if ( ! shareRequested && this.isForbiddenDragTarget( sourceFile ) ) {
 				cell.removeClass( 'is-reorder-target' );
 				const targetKey = `${ sourceFile.path }::${ position }`;
 				if ( this.dragEnterTargetKey === targetKey ) {
@@ -1730,7 +1831,7 @@ class MandalaEngineView extends ItemView {
 				this.clearDragEnterTimer();
 			}
 			if ( event.dataTransfer ) {
-				event.dataTransfer.dropEffect = 'move';
+				event.dataTransfer.dropEffect = shareRequested ? 'copy' : 'move';
 			}
 		} );
 		cell.addEventListener( 'dragleave', () => {
@@ -1753,6 +1854,7 @@ class MandalaEngineView extends ItemView {
 			event.preventDefault();
 			event.stopPropagation();
 			const dragPayload = { ...this.draggedCell };
+			const shareRequested = Boolean( dragPayload.shareMode || event.altKey );
 			this.clearDragEnterTimer();
 			this.suppressCellClick = true;
 			try {
@@ -1761,6 +1863,19 @@ class MandalaEngineView extends ItemView {
 				);
 				if ( ! ( originalSourceFile instanceof TFile ) ) {
 					new Notice( '移動元のMandalaが見つかりません。' );
+					return;
+				}
+				if ( shareRequested ) {
+					if ( linkedFile instanceof TFile ) {
+						new Notice( '共有先には空のセルを選んでください。' );
+						return;
+					}
+					await this.plugin.shareCell(
+						originalSourceFile,
+						dragPayload.position,
+						sourceFile,
+						position
+					);
 					return;
 				}
 				const draggedLinkedFile = dragPayload.linkedPath
@@ -1804,13 +1919,14 @@ class MandalaEngineView extends ItemView {
 				sourcePath: sourceFile.path,
 				position,
 				linkedPath: linkedFile.path,
+				shareMode: event.altKey,
 			};
 			this.dragLastActivity = Date.now();
 			this.suppressCellClick = true;
 			cell.addClass( 'is-reorder-source' );
 			if ( event.dataTransfer ) {
 				this.setRoundedCellDragImage( event, cell );
-				event.dataTransfer.effectAllowed = 'move';
+				event.dataTransfer.effectAllowed = 'copyMove';
 				event.dataTransfer.setData(
 					'application/x-mandala-cell',
 					JSON.stringify( this.draggedCell )
@@ -2450,8 +2566,34 @@ class MandalaEngineView extends ItemView {
 							parentPosition,
 							file
 						);
-						const clear = actions.createEl( 'button', { text: '解除' } );
-						clear.addEventListener( 'click', () => {
+						const isSharedCell = this.plugin.isSharedMandalaFile( file );
+						const remove = actions.createEl( 'button', { text: '削除' } );
+						remove.addEventListener( 'click', () => {
+							const finishAndReturn = async () => {
+								this.editingPosition = null;
+								this.editMode = false;
+								this.editingInitial = null;
+								this.mobileEditingOrigin = null;
+								await this.navigateTo( previousFile );
+							};
+							if ( isSharedCell ) {
+								new DeleteSharedFileModal(
+									this.app,
+									this.plugin,
+									file,
+									async () => {
+										await this.plugin.clearSharedCell(
+											previousFile,
+											parentPosition,
+											file,
+											connectionType
+										);
+										await finishAndReturn();
+									},
+									finishAndReturn
+								).open();
+								return;
+							}
 							new DeleteLinkedFileModal(
 								this.app,
 								this.plugin,
@@ -2469,14 +2611,19 @@ class MandalaEngineView extends ItemView {
 						} );
 					}
 
-					const cancel = actions.createEl( 'button', { text: '取消' } );
+					const cancel = actions.createEl( 'button', { text: 'キャンセル' } );
 					cancel.addEventListener( 'click', () => this.requestExitEditing() );
 					continue;
 				}
 
 				cell.createEl( 'h3', { text: this.plugin.getMandalaTitle( file ) } );
 				if ( summary ) {
-					cell.createEl( 'p', { text: String( summary ) } );
+					cell.createEl( 'p', {
+						text: String( summary ),
+						cls: this.isShortCellSummary( summary )
+							? 'mandala-engine-cell__summary--short'
+							: '',
+					} );
 				}
 
 				const parent = this.plugin.getMandalaParentLink( frontmatter, file );
@@ -2616,8 +2763,34 @@ class MandalaEngineView extends ItemView {
 				save.addEventListener( 'click', () => this.saveCurrentEditing() );
 
 				if ( linkedFile ) {
-					const clear = actions.createEl( 'button', { text: '解除' } );
-					clear.addEventListener( 'click', () => {
+					const isSharedCell = this.plugin.isSharedMandalaFile( linkedFile );
+					const remove = actions.createEl( 'button', { text: '削除' } );
+					remove.addEventListener( 'click', () => {
+						const finishEditing = async () => {
+							this.editingPosition = null;
+							this.editMode = false;
+							this.editingInitial = null;
+							this.mobileEditingOrigin = null;
+							await this.render();
+						};
+						if ( isSharedCell ) {
+							new DeleteSharedFileModal(
+								this.app,
+								this.plugin,
+								linkedFile,
+								async () => {
+									await this.plugin.clearSharedCell(
+										file,
+										position,
+										linkedFile,
+										connectionType
+									);
+									await finishEditing();
+								},
+								finishEditing
+							).open();
+							return;
+						}
 						new DeleteLinkedFileModal(
 							this.app,
 							this.plugin,
@@ -2634,7 +2807,7 @@ class MandalaEngineView extends ItemView {
 					} );
 				}
 
-				const cancel = actions.createEl( 'button', { text: '取消' } );
+				const cancel = actions.createEl( 'button', { text: 'キャンセル' } );
 				cancel.addEventListener( 'click', () => this.requestExitEditing() );
 				continue;
 			}
@@ -2644,7 +2817,7 @@ class MandalaEngineView extends ItemView {
 			if ( linkedFile ) {
 				const showsMarkdownIcon = (
 					connectionType === 'reference'
-					&& ! linkedIsMandalaRoot
+					&& ! this.plugin.isMandalaStructureFile( linkedFile )
 				) || await this.hasMarkdownBody( linkedFile );
 				if ( showsMarkdownIcon ) {
 					cell.addClass( 'is-reference-document' );
@@ -2657,7 +2830,13 @@ class MandalaEngineView extends ItemView {
 					cell.createEl( 'h3', { text: this.plugin.getMandalaTitle( linkedFile ) } );
 				}
 				if ( linkedFrontmatter.mandala_summary ) {
-					cell.createEl( 'p', { text: String( linkedFrontmatter.mandala_summary ) } );
+					const linkedSummary = String( linkedFrontmatter.mandala_summary );
+					cell.createEl( 'p', {
+						text: linkedSummary,
+						cls: this.isShortCellSummary( linkedSummary )
+							? 'mandala-engine-cell__summary--short'
+							: '',
+					} );
 				}
 				cell.addClass( 'is-linked' );
 			} else {
@@ -3057,7 +3236,11 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 	async openMandalaForFile( file, leaf, initialize = false ) {
 		if ( initialize ) {
 			await this.ensureMandalaMetadata( [ file ], true );
-			await this.renameMandalaFileToTitle( file, this.getMandalaTitle( file ) );
+			await this.renameRootFileToTitle(
+				file,
+				this.getMandalaTitle( file ),
+				true
+			);
 		}
 		const initialTrack = this.getParentTrack( file );
 		await leaf.setViewState( {
@@ -3638,7 +3821,7 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 							: metadata.categories
 								? [ metadata.categories ]
 								: [];
-						categories.push( '[[mandala]]' );
+						categories.push( '[[Mandala]]' );
 						metadata.categories = categories;
 					}
 				} );
@@ -3707,6 +3890,18 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		return path;
 	}
 
+	getAvailableFilePath( file, title, folderPath = '' ) {
+		const base = this.getSafeFilePart( title, 100 );
+		const prefix = folderPath ? `${ folderPath }/` : '';
+		let path = `${ prefix }${ base }.md`;
+		let suffix = 2;
+		while ( path !== file?.path && this.app.vault.getAbstractFileByPath( path ) ) {
+			path = `${ prefix }${ base } ${ suffix }.md`;
+			suffix += 1;
+		}
+		return path;
+	}
+
 	getMandalaLink( file ) {
 		return file instanceof TFile
 			? `[[${ file.path.replace( /\.md$/i, '' ) }]]`
@@ -3729,12 +3924,51 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		return file;
 	}
 
+	async renameRootFileToTitle( file, title, moveToVaultRoot = false ) {
+		if ( ! ( file instanceof TFile ) ) {
+			return file;
+		}
+		const oldPath = file.path;
+		const isAlreadyAtVaultRoot = file.parent === this.app.vault.getRoot();
+		const folderPath = moveToVaultRoot || isAlreadyAtVaultRoot
+			? ''
+			: ( file.parent?.path || '' );
+		const newPath = this.getAvailableFilePath( file, title, folderPath );
+		if ( newPath !== oldPath ) {
+			await this.app.fileManager.renameFile( file, newPath );
+			this.metadataCheckedPaths.delete( oldPath );
+			this.metadataCheckedPaths.add( file.path );
+			this.updateViewPaths( oldPath, file.path );
+		}
+		return file;
+	}
+
 	async clearCell( sourceFile, position ) {
 		await this.app.fileManager.processFrontMatter( sourceFile, ( frontmatter ) => {
 			delete frontmatter[ `mandala_${ position }` ];
 			delete frontmatter[ `mandala_${ position }_type` ];
 		} );
 		new Notice( 'Connection cleared.' );
+		await this.refreshViews();
+	}
+
+	isSharedMandalaFile( file ) {
+		return file instanceof TFile
+			&& this.isMandalaStructureFile( file )
+			&& this.getCellReferencesToPaths( [ file.path ] ).length > 1;
+	}
+
+	async clearSharedCell( sourceFile, position, linkedFile, connectionType ) {
+		await this.app.fileManager.processFrontMatter( sourceFile, ( frontmatter ) => {
+			delete frontmatter[ `mandala_${ position }` ];
+			delete frontmatter[ `mandala_${ position }_type` ];
+		} );
+		if ( connectionType === 'child' && linkedFile instanceof TFile ) {
+			await this.app.fileManager.processFrontMatter( linkedFile, ( frontmatter ) => {
+				delete frontmatter.mandala_parent;
+			} );
+		}
+		new Notice( 'このセルの共有をクリアしました。' );
 		await this.refreshViews();
 	}
 
@@ -3794,6 +4028,48 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 
 		visit( branchFile );
 		return deletePlan;
+	}
+
+	getCellReferencesToPaths( paths ) {
+		const targetPaths = new Set( Array.isArray( paths ) ? paths : [] );
+		const references = [];
+		for ( const sourceFile of this.app.vault.getMarkdownFiles() ) {
+			const cache = this.app.metadataCache.getFileCache( sourceFile );
+			const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
+			for ( let position = 1; position <= 8; position += 1 ) {
+				const link = this.cleanLink( frontmatter[ `mandala_${ position }` ] || '' );
+				if ( ! link ) {
+					continue;
+				}
+				const linkedFile = this.app.metadataCache.getFirstLinkpathDest(
+					link,
+					sourceFile.path
+				);
+				if ( linkedFile instanceof TFile && targetPaths.has( linkedFile.path ) ) {
+					references.push( { sourceFile, position } );
+				}
+			}
+		}
+		return references;
+	}
+
+	async deleteSharedMandalaFiles( paths ) {
+		const deletePlan = Array.isArray( paths ) ? paths : [];
+		const references = this.getCellReferencesToPaths( deletePlan );
+		try {
+			for ( const { sourceFile, position } of references ) {
+				await this.app.fileManager.processFrontMatter( sourceFile, ( frontmatter ) => {
+					delete frontmatter[ `mandala_${ position }` ];
+					delete frontmatter[ `mandala_${ position }_type` ];
+				} );
+			}
+			return await this.trashMandalaBranch( deletePlan );
+		} catch ( error ) {
+			console.error( 'Mandala Engine shared delete failed:', error );
+			new Notice( '共有セルをすべて削除できませんでした。' );
+			await this.refreshViews();
+			return false;
+		}
 	}
 
 	async trashMandalaBranch( deletePlan ) {
@@ -3923,6 +4199,44 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		} );
 	}
 
+	async shareCell( sourceFile, fromPosition, targetFile, toPosition ) {
+		const sourceSnapshot = this.getCellSnapshot( sourceFile, fromPosition );
+		const targetSnapshot = this.getCellSnapshot( targetFile, toPosition );
+		if ( ! sourceSnapshot.value ) {
+			new Notice( '共有元のセルが空になっています。' );
+			return false;
+		}
+		if ( targetSnapshot.value ) {
+			new Notice( '共有先には空のセルを選んでください。' );
+			return false;
+		}
+		const sharedFile = this.app.metadataCache.getFirstLinkpathDest(
+			this.cleanLink( sourceSnapshot.value ),
+			sourceFile.path
+		);
+		if ( ! ( sharedFile instanceof TFile ) ) {
+			new Notice( '共有するMDノートが見つかりません。' );
+			return false;
+		}
+
+		await this.applyCellSnapshot( targetFile, toPosition, {
+			value: this.getMandalaLink( sharedFile ),
+			type: 'reference',
+		} );
+		this.recordCellOperation( {
+			kind: 'share',
+			sourcePath: sourceFile.path,
+			fromPosition,
+			sourceSnapshot,
+			targetPath: targetFile.path,
+			toPosition,
+			targetSnapshot,
+		} );
+		new Notice( 'セルを共有しました。' );
+		await this.refreshViews();
+		return true;
+	}
+
 	recordCellOperation( operation ) {
 		this.cellOperationHistory.push( operation );
 		if ( this.cellOperationHistory.length > 20 ) {
@@ -3957,16 +4271,18 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 				operation.toPosition,
 				operation.targetSnapshot
 			);
-			await this.updateMovedChildParent(
-				operation.sourceSnapshot,
-				targetFile,
-				sourceFile
-			);
-			await this.updateMovedChildParent(
-				operation.targetSnapshot,
-				sourceFile,
-				targetFile
-			);
+			if ( operation.kind !== 'share' ) {
+				await this.updateMovedChildParent(
+					operation.sourceSnapshot,
+					targetFile,
+					sourceFile
+				);
+				await this.updateMovedChildParent(
+					operation.targetSnapshot,
+					sourceFile,
+					targetFile
+				);
+			}
 		} catch ( error ) {
 			console.error( 'Mandala Engine undo cell operation failed:', error );
 			try {
@@ -4076,12 +4392,12 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 					: frontmatter.categories
 						? [ frontmatter.categories ]
 						: [];
-				categories.push( '[[mandala]]' );
+				categories.push( '[[Mandala]]' );
 				frontmatter.categories = categories;
 			}
 		} );
 
-		await this.renameMandalaFileToTitle( file, cleanTitle );
+		await this.renameRootFileToTitle( file, cleanTitle );
 
 		this.metadataCheckedPaths.add( file.path );
 		new Notice( `Mandala title changed to ${ cleanTitle }.` );
@@ -4122,7 +4438,7 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 					: currentFrontmatter.categories
 						? [ currentFrontmatter.categories ]
 						: [];
-				categories.push( '[[mandala]]' );
+				categories.push( '[[Mandala]]' );
 				currentFrontmatter.categories = categories;
 			}
 		} );
@@ -4180,7 +4496,7 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 				`mandala_summary: ${ JSON.stringify( summary || '' ) }`,
 				'mandala_color_mode: inherit',
 				'categories:',
-				'  - "[[mandala]]"',
+				'  - "[[Mandala]]"',
 				'---',
 				'',
 			].join( '\n' );
@@ -4226,7 +4542,7 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 						: frontmatter.categories
 							? [ frontmatter.categories ]
 							: [];
-					categories.push( '[[mandala]]' );
+					categories.push( '[[Mandala]]' );
 					frontmatter.categories = categories;
 				}
 			} );
