@@ -1,5 +1,6 @@
 const {
 	ItemView,
+	Menu,
 	Modal,
 	Notice,
 	Plugin,
@@ -944,6 +945,28 @@ class MandalaEngineView extends ItemView {
 			new Set(),
 			[ rootFile.path ]
 		);
+	}
+
+	showMandalaRootMenu( event, currentRoot ) {
+		const rootFiles = this.plugin.getMandalaRootFiles();
+		if ( ! rootFiles.length ) {
+			new Notice( 'Mandalaルートが見つかりません。' );
+			return;
+		}
+
+		const menu = new Menu();
+		for ( const rootFile of rootFiles ) {
+			menu.addItem( ( item ) => item
+				.setTitle( this.plugin.getMandalaTitle( rootFile ) )
+				.setChecked( rootFile.path === currentRoot.path )
+				.onClick( async () => {
+					if ( rootFile.path === currentRoot.path ) {
+						return;
+					}
+					await this.navigateToTrack( rootFile, [ rootFile.path ] );
+				} ) );
+		}
+		menu.showAtMouseEvent( event );
 	}
 
 	clearDragEnterTimer() {
@@ -2459,7 +2482,30 @@ class MandalaEngineView extends ItemView {
 				const item = trackList.createEl( 'li', {
 					cls: 'mandala-engine-track__item',
 				} );
-				if ( index === this.track.length - 1 ) {
+				if ( index === 0 ) {
+					const rootButton = item.createEl( 'button', {
+						cls: 'mandala-engine-track__button mandala-engine-track__root-switcher',
+						attr: {
+							type: 'button',
+							'aria-label': '別のMandalaへ移動',
+							'aria-haspopup': 'menu',
+							...( index === this.track.length - 1
+								? { 'aria-current': 'page' }
+								: {} ),
+						},
+					} );
+					rootButton.createSpan( {
+						text: this.plugin.getMandalaTitle( trackFile ),
+						cls: 'mandala-engine-track__root-title',
+					} );
+					rootButton.createSpan( {
+						text: '⌄',
+						cls: 'mandala-engine-track__root-chevron',
+					} );
+					rootButton.addEventListener( 'click', ( event ) => {
+						this.showMandalaRootMenu( event, trackFile );
+					} );
+				} else if ( index === this.track.length - 1 ) {
 					item.createEl( 'span', {
 						text: this.plugin.getMandalaTitle( trackFile ),
 						attr: { 'aria-current': 'page' },
@@ -2985,6 +3031,18 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 			}
 		}
 		return false;
+	}
+
+	getMandalaRootFiles() {
+		return this.app.vault.getMarkdownFiles()
+			.filter( ( file ) => (
+				this.isMandalaStructureFile( file )
+				&& this.getMandalaRole( file ) === 'root'
+			) )
+			.sort( ( left, right ) => this.getMandalaTitle( left ).localeCompare(
+				this.getMandalaTitle( right ),
+				'ja'
+			) );
 	}
 
 	setExplorerContext( file, rootFile = null, ownerLeaf = null ) {

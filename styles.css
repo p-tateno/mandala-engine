@@ -433,6 +433,30 @@
 	color: var(--mandala-text-color) !important;
 }
 
+.mandala-engine-track .mandala-engine-track__root-switcher {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+}
+
+.mandala-engine-track__root-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mandala-engine-track__root-chevron {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 0.85em;
+	height: 1em;
+	font-size: 1.05em;
+	font-weight: 700;
+	line-height: 1;
+}
+
 .mandala-engine-track [aria-current='page'] {
 	display: block;
 	max-width: min(320px, 42vw);
