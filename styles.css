@@ -4,6 +4,7 @@
 	--mandala-gray-cell-color: #f3f3f3;
 	--mandala-cell-color: #fff;
 	--mandala-text-color: #222;
+	--mandala-summary-color: #4d4d4d;
 	--mandala-muted-color: #555;
 	--mandala-subtle-color: #777;
 	--mandala-faint-color: #999;
@@ -24,6 +25,7 @@
 	--mandala-gray-cell-color: #24272c;
 	--mandala-cell-color: #2d3036;
 	--mandala-text-color: #edf0f3;
+	--mandala-summary-color: #b3b3b3;
 	--mandala-muted-color: #bcc2ca;
 	--mandala-subtle-color: #959ca6;
 	--mandala-faint-color: #747c87;
@@ -40,6 +42,7 @@
 	--mandala-gray-cell-color: var(--background-secondary-alt, var(--background-modifier-hover));
 	--mandala-cell-color: var(--background-secondary);
 	--mandala-text-color: var(--text-normal);
+	--mandala-summary-color: var(--text-muted);
 	--mandala-muted-color: var(--text-muted);
 	--mandala-subtle-color: var(--text-faint);
 	--mandala-faint-color: var(--text-faint);
@@ -874,6 +877,10 @@
 .mandala-engine-cell p {
 	margin: 0;
 	font-size: clamp(0.68rem, 1.6vw, 0.9rem);
+}
+
+.mandala-engine-cell p:not(.mandala-engine-cell__summary-editor) {
+	color: var(--mandala-summary-color);
 }
 
 .mandala-engine-cell p.mandala-engine-cell__summary--short {

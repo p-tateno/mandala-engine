@@ -20,6 +20,12 @@ const DEFAULT_SETTINGS = {
 	autoOpenRootNotes: true,
 	themeMode: 'auto',
 	colorSource: 'mandala',
+	lightBackgroundColor: '#e3e3e3',
+	lightCellColor: '#ffffff',
+	lightGrayCellColor: '#f3f3f3',
+	darkBackgroundColor: '#1c1e22',
+	darkCellColor: '#2d3036',
+	darkGrayCellColor: '#24272c',
 };
 const DEFAULT_BACKGROUND_COLOR = '#e3e3e3';
 const DEFAULT_GRAY_CELL_COLOR = '#f3f3f3';
@@ -78,6 +84,16 @@ class MandalaEngineSettingTab extends PluginSettingTab {
 					} );
 			} );
 
+		containerEl.createEl( 'h3', { text: '標準カラー：ライト' } );
+		this.addStandardColorSetting( containerEl, '背景', 'lightBackgroundColor' );
+		this.addStandardColorSetting( containerEl, '通常セル', 'lightCellColor' );
+		this.addStandardColorSetting( containerEl, 'グレーセル', 'lightGrayCellColor' );
+
+		containerEl.createEl( 'h3', { text: '標準カラー：ダーク' } );
+		this.addStandardColorSetting( containerEl, '背景', 'darkBackgroundColor' );
+		this.addStandardColorSetting( containerEl, '通常セル', 'darkCellColor' );
+		this.addStandardColorSetting( containerEl, 'グレーセル', 'darkGrayCellColor' );
+
 		new Setting( containerEl )
 			.setName( 'MandalaノートをMandala Engineで自動的に開く' )
 			.setDesc( 'Mandalaフォルダ内のMandalaノートや既存のrootノートを開いたとき、同じタブをMandala表示へ切り替えます。' )
@@ -86,6 +102,18 @@ class MandalaEngineSettingTab extends PluginSettingTab {
 					.setValue( this.plugin.settings.autoOpenRootNotes )
 					.onChange( async ( value ) => {
 						await this.plugin.setAutoOpenRootNotes( value );
+					} );
+			} );
+	}
+
+	addStandardColorSetting( containerEl, name, settingKey ) {
+		new Setting( containerEl )
+			.setName( name )
+			.addColorPicker( ( picker ) => {
+				picker
+					.setValue( this.plugin.settings[ settingKey ] )
+					.onChange( async ( value ) => {
+						await this.plugin.setStandardColor( settingKey, value );
 					} );
 			} );
 	}
@@ -803,7 +831,10 @@ class MandalaEngineView extends ItemView {
 		const role = String( frontmatter.mandala_role || '' ).trim().toLowerCase();
 		const isRoot = position === 0;
 		const isMandalaRoot = role === 'root' || this.plugin.isLegacyRootFile( file );
-		const isMandala = isRoot || connectionType !== 'reference' || isMandalaRoot;
+		const isMandala = isRoot
+			|| connectionType !== 'reference'
+			|| isMandalaRoot
+			|| this.plugin.isMandalaStructureFile( file );
 		const repeated = visited.has( file.path );
 		const childEntries = isMandala && ! repeated
 			? this.getOutlineChildren( file )
@@ -2133,21 +2164,22 @@ class MandalaEngineView extends ItemView {
 		const mandalaColors = file
 			? this.plugin.getMandalaColors( file, resolvedTheme )
 			: {
-				background: resolvedTheme === 'dark'
-					? DEFAULT_DARK_BACKGROUND_COLOR
-					: DEFAULT_BACKGROUND_COLOR,
-				grayCell: resolvedTheme === 'dark'
-					? DEFAULT_DARK_GRAY_CELL_COLOR
-					: DEFAULT_GRAY_CELL_COLOR,
+				...this.plugin.getStandardColors( resolvedTheme ),
 				hasCustomBackground: false,
 				hasCustomGrayCell: false,
 			};
-		if ( mandalaColors.hasCustomBackground ) {
+		const usesMandalaStandard = this.plugin.settings.colorSource === 'mandala';
+		if ( mandalaColors.hasCustomBackground || usesMandalaStandard ) {
 			container.style.setProperty( '--mandala-background-color', mandalaColors.background );
 		} else {
 			container.style.removeProperty( '--mandala-background-color' );
 		}
-		if ( mandalaColors.hasCustomGrayCell ) {
+		if ( usesMandalaStandard ) {
+			container.style.setProperty( '--mandala-cell-color', mandalaColors.cell );
+		} else {
+			container.style.removeProperty( '--mandala-cell-color' );
+		}
+		if ( mandalaColors.hasCustomGrayCell || usesMandalaStandard ) {
 			container.style.setProperty( '--mandala-gray-cell-color', mandalaColors.grayCell );
 		} else {
 			container.style.removeProperty( '--mandala-gray-cell-color' );
@@ -3206,6 +3238,28 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		await this.refreshViews();
 	}
 
+	async setStandardColor( settingKey, color ) {
+		const allowedKeys = [
+			'lightBackgroundColor',
+			'lightCellColor',
+			'lightGrayCellColor',
+			'darkBackgroundColor',
+			'darkCellColor',
+			'darkGrayCellColor',
+		];
+		if ( ! allowedKeys.includes( settingKey ) ) {
+			return;
+		}
+		const cleanColor = this.getHexColor( color, '' );
+		if ( ! cleanColor ) {
+			new Notice( '標準カラーを保存できませんでした。' );
+			return;
+		}
+		this.settings[ settingKey ] = cleanColor;
+		await this.saveData( this.settings );
+		await this.refreshViews();
+	}
+
 	async setAutoOpenRootNotes( enabled ) {
 		this.settings.autoOpenRootNotes = Boolean( enabled );
 		await this.saveData( this.settings );
@@ -3644,24 +3698,38 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 		return /^#[0-9a-f]{6}$/.test( color ) ? color : fallback;
 	}
 
+	getStandardColors( resolvedTheme = 'light' ) {
+		const isDark = resolvedTheme === 'dark';
+		return {
+			background: this.getHexColor(
+				this.settings[ isDark ? 'darkBackgroundColor' : 'lightBackgroundColor' ],
+				isDark ? DEFAULT_DARK_BACKGROUND_COLOR : DEFAULT_BACKGROUND_COLOR
+			),
+			cell: this.getHexColor(
+				this.settings[ isDark ? 'darkCellColor' : 'lightCellColor' ],
+				isDark ? '#2d3036' : '#ffffff'
+			),
+			grayCell: this.getHexColor(
+				this.settings[ isDark ? 'darkGrayCellColor' : 'lightGrayCellColor' ],
+				isDark ? DEFAULT_DARK_GRAY_CELL_COLOR : DEFAULT_GRAY_CELL_COLOR
+			),
+		};
+	}
+
 	getMandalaColors( file, resolvedTheme = 'light' ) {
 		const rootFile = this.getMandalaRootFile( file );
 		const cache = this.app.metadataCache.getFileCache( rootFile );
 		const frontmatter = cache && cache.frontmatter ? cache.frontmatter : {};
-		const backgroundFallback = resolvedTheme === 'dark'
-			? DEFAULT_DARK_BACKGROUND_COLOR
-			: DEFAULT_BACKGROUND_COLOR;
-		const grayCellFallback = resolvedTheme === 'dark'
-			? DEFAULT_DARK_GRAY_CELL_COLOR
-			: DEFAULT_GRAY_CELL_COLOR;
+		const standardColors = this.getStandardColors( resolvedTheme );
 		return {
 			background: this.getHexColor(
 				frontmatter.mandala_background_color,
-				backgroundFallback
+				standardColors.background
 			),
+			cell: standardColors.cell,
 			grayCell: this.getHexColor(
 				frontmatter.mandala_gray_cell_color,
-				grayCellFallback
+				standardColors.grayCell
 			),
 			hasCustomBackground: Boolean(
 				this.getHexColor( frontmatter.mandala_background_color, '' )
@@ -4497,8 +4565,6 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 			}
 		} );
 
-		await this.renameRootFileToTitle( file, cleanTitle );
-
 		this.metadataCheckedPaths.add( file.path );
 		new Notice( `Mandala title changed to ${ cleanTitle }.` );
 		await this.refreshViews();
@@ -4542,8 +4608,6 @@ module.exports = class MandalaEnginePlugin extends Plugin {
 				currentFrontmatter.categories = categories;
 			}
 		} );
-		await this.renameMandalaFileToTitle( file, cleanTitle );
-
 		this.metadataCheckedPaths.add( file.path );
 		new Notice( `Mandala title changed to ${ cleanTitle }.` );
 		await this.refreshViews();
